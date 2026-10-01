@@ -93,6 +93,7 @@ def app_get_plan(
 
         diet_by_day: dict = {}
         training_by_day: dict = {}
+        week_summary: dict = {}
 
         for day_entry in raw.get("days", []):
             day_name = day_entry.get("day", "")
@@ -107,16 +108,24 @@ def app_get_plan(
                 "macros": day_entry.get("macros", {}),
                 "is_sport_session": day_entry.get("is_sport_session", False),
             }
+            week_summary[day_name] = {
+                "day_type": day_entry.get("day_type", ""),
+                "is_sport_session": day_entry.get("is_sport_session", False),
+                "has_workout": bool(day_entry.get("workout", {}).get("exercises")),
+                "has_meals": bool(day_entry.get("meals")),
+            }
 
         result = {
             **raw,
-            "diet": diet_by_day if diet_by_day else {},
+            "diet":     diet_by_day     if diet_by_day     else {},
             "training": training_by_day if training_by_day else {},
-            "source": "database",
+            "week_summary": week_summary,
+            "source":   "database",
         }
         result.setdefault("days", [])
         result.setdefault("generated_at", None)
         result.setdefault("weekly_goal", None)
+        result.setdefault("plan_explanation", None)
 
         print(f"[FitAI][app_get_plan] user_id={user.id} — OK, dni={len(raw.get('days', []))}")
         return result
@@ -130,6 +139,75 @@ def app_get_plan(
     except Exception as exc:
         print(f"[FitAI][app_get_plan] ERROR user_id={user.id} — {type(exc).__name__}: {exc}")
         return {**_EMPTY, "source": "error"}
+
+
+@router.get("/week-summary", tags=["plan"])
+def app_get_week_summary(
+    user: UserDB = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """
+    GET /app/plan/week-summary
+
+    Zwraca kompaktowe podsumowanie tygodnia dla widoku Plan.
+    """
+    try:
+        if not user.weekly_plan_json:
+            return {
+                "days": [],
+                "strength_sessions": 0,
+                "sport_sessions": 0,
+                "rest_days": 0,
+                "light_days": 0,
+                "has_plan": False,
+            }
+
+        raw = user.get_dict("weekly_plan_json")
+        if not raw or not isinstance(raw, dict):
+            return {
+                "days": [],
+                "strength_sessions": 0,
+                "sport_sessions": 0,
+                "rest_days": 0,
+                "light_days": 0,
+                "has_plan": False,
+            }
+
+        days = raw.get("days", [])
+        strength = sum(1 for d in days if not d.get("is_sport_session") and d.get("workout", {}).get("exercises"))
+        sport = sum(1 for d in days if d.get("is_sport_session"))
+        rest = sum(1 for d in days if d.get("day_type") == "rest")
+        light = sum(1 for d in days if d.get("day_type") == "light")
+
+        return {
+            "days": [
+                {
+                    "day": d.get("day", ""),
+                    "day_type": d.get("day_type", ""),
+                    "is_sport_session": d.get("is_sport_session", False),
+                    "title": d.get("workout", {}).get("title", ""),
+                    "has_workout": bool(d.get("workout", {}).get("exercises")),
+                    "has_meals": bool(d.get("meals")),
+                }
+                for d in days
+            ],
+            "strength_sessions": strength,
+            "sport_sessions": sport,
+            "rest_days": rest,
+            "light_days": light,
+            "has_plan": True,
+            "plan_explanation": raw.get("plan_explanation"),
+        }
+    except Exception as exc:
+        print(f"[FitAI][app_get_week_summary] ERROR user_id={user.id} — {type(exc).__name__}: {exc}")
+        return {
+            "days": [],
+            "strength_sessions": 0,
+            "sport_sessions": 0,
+            "rest_days": 0,
+            "light_days": 0,
+            "has_plan": False,
+        }
 
 
 @router.put("/current", tags=["plan"])
@@ -153,7 +231,7 @@ def app_save_plan(
         if not db_user:
             raise HTTPException(status_code=404, detail="Użytkownik nie znaleziony")
         db_user.set_dict("weekly_plan_json", plan)
-        db_user.updated_at = datetime.now().isoformat()
+        db_user.updated_at = datetime.now()
         session.add(db_user)
         session.commit()
         session.refresh(db_user)

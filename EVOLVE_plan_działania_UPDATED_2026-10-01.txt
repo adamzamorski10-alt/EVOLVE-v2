@@ -1,0 +1,1456 @@
+EVOLVE — MASTER PRODUCT PLAN Wersja: 2026-10-01 Status: AKTYWNY PLAN
+GŁÓWNY — zaktualizowany po Transformation Sprint 2
+
+======================================================================
+0. STATUS DOKUMENTU
+======================================================================
+
+Ten dokument jest kanonicznym planem produktu i rozwoju EVOLVE.
+
+Zawiera dwa poziomy:
+
+MASTER ROADMAP - długoterminowa wizja produktu, - docelowe moduły, -
+zaakceptowane innowacje, - zasady architektury i bezpieczeństwa.
+
+ACTIVE BUILD ROADMAP - rzeczywista kolejność najbliższych prac, -
+aktualny stan implementacji, - zależności, - kolejne vertical slices.
+
+ACTIVE BUILD ROADMAP może zmieniać kolejność MASTER ROADMAP, jeżeli
+testy, dane, architektura albo rzeczywista wartość produktu uzasadniają
+zmianę.
+
+Nie należy traktować starych numerów etapów jako ważniejszych od
+aktualnego stanu produktu.
+
+====================================================================== 1.
+WIZJA
+======================================================================
+
+EVOLVE ma być prywatnym, długoterminowym Personal Performance Coach, a
+docelowo Personal Performance OS.
+
+EVOLVE nie jest przede wszystkim: - chatbotem, - generatorem
+treningów, - licznikiem kalorii, - aplikacją z wykresami, - kolekcją
+ręcznych formularzy.
+
+EVOLVE ma: - rozumieć użytkownika, - zbierać dane, - pamiętać
+historię, - rozumieć cele i ograniczenia, - tworzyć plany, - pomagać
+wykonywać plan, - rejestrować rzeczywiste wykonanie, - analizować
+Expected vs Actual, - wykrywać wzorce, - proponować bezpieczne zmiany, -
+wyjaśniać ważne decyzje, - uczyć się indywidualnej reakcji
+użytkownika, - z czasem wykorzystywać AI jako warstwę pomocniczą.
+
+Docelowa pętla:
+
+PROFILE + GOALS + CONSTRAINTS + HISTORY + CURRENT STATE ↓ DOMAIN ENGINES
+↓ DECISION CONTEXT ↓ DECISION ENGINE ↓ SAFETY ENGINE ↓ PLAN /
+RECOMMENDATION ↓ TODAY ↓ EXECUTE ↓ LOG ↓ ANALYZE ↓ EXPECTED VS ACTUAL ↓
+LEARN RESPONSE ↓ ADAPTATION PROPOSAL ↓ NEW PLAN ↺
+
+Najważniejsza zasada:
+
+LLM ≠ MÓZG APLIKACJI.
+
+Źródłem prawdy są: - dane, - historia, - deterministyczne obliczenia, -
+reguły domenowe, - Decision Engine, - Safety Engine.
+
+AI może pomagać w: - komunikacji, - interpretacji, - naturalnym
+języku, - podsumowaniach, - orkiestracji, - interfejsie konwersacyjnym.
+
+AI nie może być źródłem prawdy dla: - historii, - bezpieczeństwa, -
+deterministycznych obliczeń, - kalorii/makro, - autorytatywnych
+wyników, - stanu użytkownika.
+
+EVOLVE musi być użyteczny bez AI.
+
+======================================================================
+2. AKTUALNY PRODUKT — NAJWAŻNIEJSZA ZMIANA KIERUNKU
+======================================================================
+
+EVOLVE powstał początkowo jako nowy, bezpieczny system z własną
+architekturą.
+
+Następnie przeanalizowano stary Training Coach.
+
+Podjęta decyzja:
+
+EVOLVE 2.0 =
+
+EVOLVE jako: - architektura, - bezpieczeństwo, - model danych, -
+domena, - silniki, - historia, - testy,
+
+-   
+
+Training Coach jako: - źródło gotowych treści, - ćwiczenia, - drille, -
+posiłki, - pomysły UX, - progression concepts, - istniejące wartościowe
+mechanizmy.
+
+Nie przenosimy starego backendu bezpośrednio.
+
+Nie przenosimy: - starego monolitu, - niebezpiecznego auth, - Netlify
+Identity, - starego Stripe, - Discord, - SQLite jako docelowej bazy, -
+niekontrolowanych JSON blobów jako głównego modelu, - niezweryfikowanej
+logiki jako źródła prawdy.
+
+Portujemy WARTOŚĆ, nie stare błędy architektoniczne.
+
+======================================================================
+3. GŁÓWNY CEL PIERWSZEGO REAL-USABLE MVP
+======================================================================
+
+Pierwsze realnie używalne MVP jest przede wszystkim zoptymalizowane pod
+codzienne używanie przez użytkownika.
+
+Musi jednak pozostać poprawnie zaprojektowane jako produkt ogólny.
+
+Pierwszy MVP skupia się na:
+
+1.  PROFIL
+2.  CELE
+3.  MANDATORY INITIAL ASSESSMENT
+4.  AVAILABILITY
+5.  AUTOMATIC PLAN
+6.  MÓJ DZIEŃ
+7.  TRAINING EXECUTION
+8.  LOGGING
+9.  RECOVERY
+10. NUTRITION FOUNDATION
+11. BASKETBALL
+12. PROGRESS
+13. ADAPTATION
+14. HISTORY
+
+AI Coach jest odroczony.
+
+AI Kitchen jest odroczony jako funkcja produktowa.
+
+AI nie jest wymagane do działania core loop.
+
+======================================================================
+4. PRODUKTOWY CORE LOOP
+======================================================================
+
+Użytkownik:
+
+REGISTER → ONBOARD → INITIAL ASSESSMENT → GOALS → AVAILABILITY →
+AUTOMATIC PLAN → TODAY → TRAINING / SPORT / NUTRITION / RECOVERY → LOG →
+ANALYZE → ADAPTATION → NEXT PLAN
+
+Najważniejszym ekranem jest:
+
+MÓJ DZIEŃ
+
+Mój Dzień odpowiada:
+
+“Co mam dzisiaj zrobić i dlaczego?”
+
+Plan odpowiada:
+
+“Co robię w tym tygodniu?”
+
+Training odpowiada:
+
+“Jak wykonać i zapisać trening?”
+
+Sport odpowiada:
+
+“Jak rozwijam koszykówkę i jak wygląda mój wynik?”
+
+Dieta odpowiada:
+
+“Jak realizuję żywienie?”
+
+Postępy odpowiadają:
+
+“Co rzeczywiście się zmienia?”
+
+Profil odpowiada:
+
+“Kim jestem, jakie mam ograniczenia i co wpływa na plan?”
+
+======================================================================
+5. AKTUALNY STAN — PO TRANSFORMATION SPRINT 2
+======================================================================
+
+STATUS OGÓLNY:
+
+Transformation Sprint 2: PASS WITH LIMITATIONS
+
+SECURITY: 0 znanych CRITICAL findings z ostatniego audytu.
+
+TESTS: 81 testów zebranych. 69 passed. 12 skipped. 0 failed.
+
+Skipped: E2E wymagające żywego serwera / środowiska.
+
+Najważniejsze wykonane prace:
+
+SECURITY - usunięty/neutralizowany IDOR /users/{user_id} -
+usunięty/neutralizowany POST /users/{user_id} - usunięty dostęp do
+/users/{user_id}/logs - usunięty link Discord - wyłączony Stripe
+webhook - Kitchen wymaga JWT - identity_id usunięte z request body
+Kitchen - reminders-due wymaga CRON_SECRET - _upsert_user_from_profile
+nie może zmieniać ownership identity - usunięty fitai_api.py
+
+TESTING - izolacja testów przez in-memory SQLite - testowy rate limiter
+nie blokuje integracji - 18 testów izolacji A/B - brak znanych failed
+tests w bieżącej suite
+
+PLANNER 2.0 - frequency ma właściwą semantykę - sport days są
+constraintem - equipment filtering działa - avoid_exercises działa -
+plan explanation istnieje - plan persistence działa - week summary
+istnieje
+
+AVAILABILITY - GET /app/availability - PUT /app/availability - dzień
+może posiadać: - time window - location - equipment
+
+TODAY - primary_action - plan_explanation - nutrition_targets -
+sport-session information
+
+PLAN - week_summary - day types - workout/sport information -
+explanation
+
+WAŻNE OGRANICZENIE:
+
+Backend jest obecnie dalej rozwinięty niż frontend w części nowych
+funkcji. Następnym priorytetem jest domknięcie pionowych przepływów
+użytkownika, a nie dokładanie kolejnych backendowych endpointów bez UI.
+
+======================================================================
+6. CO ZOSTAŁO Z POPRZEDNIEGO EVOLVE
+======================================================================
+
+Fundamenty wykonane w poprzedniej wersji EVOLVE pozostają ważne:
+
+-   React
+-   TypeScript
+-   Vite
+-   Tailwind
+-   React Router
+-   i18n
+-   PWA
+-   backend TypeScript / Fastify w nowej gałęzi EVOLVE
+-   PostgreSQL / Prisma target architecture
+-   repositories
+-   domain/application separation
+-   authentication
+-   sessions
+-   ownership
+-   CSRF
+-   rate limiting
+-   profile
+-   onboarding
+-   goals
+-   Today
+-   RecoveryCheckIn
+-   ReadinessEngine
+-   Event/History foundation
+-   Training
+-   Nutrition foundation
+-   Progress
+-   Decision Context
+-   Decision Engine
+-   Recommendation
+-   Training Outcome Analysis
+-   Training Response Analysis
+-   Adaptation Proposal
+-   Adaptation Persistence
+-   adaptation user workflow
+-   planner
+-   basketball performance foundation
+
+W trakcie transformacji starego Training Coach część jego
+funkcjonalności jest stopniowo włączana do docelowego produktu.
+
+======================================================================
+7. ARCHITEKTURA
+======================================================================
+
+Docelowy kierunek:
+
+CLIENT - responsive Web - PWA - później mobile apps
+
+API - authentication - profile - goals - availability - plans -
+training - nutrition - recovery - sports - progress - history -
+decisions
+
+DOMAIN - Training - Nutrition - Recovery - Sports - Goals - Progress -
+Planning - Data Quality
+
+CONTROL - Decision Context - Decision Engine - Safety Engine -
+Explainability - Confidence - Decision Log - Versioning
+
+DATA - profile - goals - availability - events - plans - sessions -
+results - meals - recovery - sports metrics - decisions - history
+
+AI LAYER — PÓŹNIEJ - AI Coach - natural language logging - contextual
+assistance - explanation - AI orchestration
+
+AI layer nie może wymuszać przebudowy domeny.
+
+======================================================================
+8. BEZPIECZEŃSTWO — STANDARD
+======================================================================
+
+Bezpieczeństwo ma priorytet nad wygodą implementacji.
+
+Obowiązuje:
+
+AUTHENTICATED PRINCIPAL → CANONICAL USER → OWNED RESOURCE → ACTION
+
+Nigdy:
+
+CLIENT USER_ID → RESOURCE
+
+Nigdy nie ufamy: - user_id z body, - identity_id z body, - profile
+ownership z body, - account ID dostarczonemu przez klienta.
+
+Każdy endpoint użytkownika musi mieć: - authentication, - ownership, -
+właściwą autoryzację, - walidację, - bezpieczne błędy.
+
+Każdy istotny security fix musi być: - przetestowany, - najlepiej
+testowany na dwóch kontach, - zweryfikowany również bezpośrednim API
+requestem.
+
+======================================================================
+9. PLANNER — OBECNY I DOCELOWY
+======================================================================
+
+Planner jest jednym z najważniejszych silników EVOLVE.
+
+Aktualnie potrafi uwzględniać: - frequency, - sport days, - available
+equipment, - avoid exercises, - availability, - plan explanation.
+
+Docelowo:
+
+PROFILE + ASSESSMENT + GOALS + AVAILABILITY + LOCATION + EQUIPMENT +
+SPORT SCHEDULE + RECOVERY + TRAINING HISTORY + DATA QUALITY +
+CONSTRAINTS ↓ CONSTRAINT ENGINE ↓ SESSION TYPE ↓ EXERCISE SELECTION ↓
+LOAD / SET / REP ↓ WEEK DISTRIBUTION ↓ PLAN ↓ EXPLANATION
+
+Priorytet ograniczeń:
+
+1.  SAFETY
+2.  HARD USER CONSTRAINTS
+3.  AVAILABILITY
+4.  SPORT COMMITMENTS
+5.  PRIMARY GOAL
+6.  TRAINING FREQUENCY
+7.  RECOVERY
+8.  LOCATION / EQUIPMENT
+9.  EXERCISE PREFERENCE
+10. OPTIMIZATION
+
+Planner nie może łamać twardego ograniczenia w imię optymalizacji.
+
+Przykład:
+
+Środa: Basketball
+
+Piątek: Basketball
+
+Jeżeli użytkownik ma 3 treningi siłowe: planner powinien umieścić
+odpowiednią liczbę treningów siłowych w pozostałych dniach, z
+uwzględnieniem recovery i konfliktów.
+
+Nie wolno traktować 7-dniowego planu jako 7 treningów.
+
+======================================================================
+10. AVAILABILITY
+======================================================================
+
+Docelowo każdy dzień może mieć:
+
+-   available / unavailable
+-   time window
+-   location
+-   equipment
+-   sport/activity
+
+Przykład:
+
+MONDAY 18:00–20:00 GYM barbell + dumbbells + machines
+
+WEDNESDAY 17:00–19:00 BASKETBALL COURT basketball + cones
+
+FRIDAY 18:00–19:30 HOME dumbbells
+
+Dostępność musi wpływać na backendowy planner.
+
+W przyszłości:
+
+-   recurring weekly schedule
+-   one-off overrides
+-   changed location
+-   changed equipment
+-   unavailable exceptions
+-   extra availability.
+
+======================================================================
+11. PROFILE → BEHAVIOR
+======================================================================
+
+Każde istotne pole profilu musi mieć uzasadnienie.
+
+Dla każdego pola sprawdzamy:
+
+STORED → READ → USED → CHANGES BEHAVIOR → TESTED
+
+Dotyczy m.in.: - age - height - weight - sex where needed - goal -
+training experience - frequency - equipment - locations - sport - sport
+position - sport days - priorities - avoid exercises - nutrition
+preferences - allergies - recovery preferences.
+
+Pole, które nie wpływa na zachowanie, powinno: - zostać podłączone, -
+zostać jawnie odroczone, - albo zostać usunięte z aktywnego UX.
+
+Nie budujemy “fake personalization”.
+
+======================================================================
+12. INITIAL ASSESSMENT
+======================================================================
+
+INITIAL ASSESSMENT jest obowiązkowy dla pierwszego meaningful automatic
+planu.
+
+Assessment ma być krótki i praktyczny.
+
+Ma dostarczać baseline dla: - training level, - basketball level, -
+physical profile, - priorities, - relevant constraints.
+
+Zmiana wyników assessment powinna w kontrolowany sposób wpływać na
+początkowy plan.
+
+Nie wolno udawać, że assessment ma wpływ, jeśli nie ma.
+
+======================================================================
+13. MÓJ DZIEŃ
+======================================================================
+
+MÓJ DZIEŃ jest centralnym ekranem.
+
+Powinien odpowiadać:
+
+CO MAM DZISIAJ ZROBIĆ?
+
+Docelowo:
+
+HEADER - data - readiness/status - krótki kontekst
+
+PRIMARY ACTION - dzisiejszy główny trening/aktywność - czas -
+lokalizacja - cel - Start
+
+TODAY ACTIVITIES - basketball - strength - recovery - nutrition
+
+WHY TODAY? - deterministyczne wyjaśnienie
+
+RECOVERY - aktualny recovery/readiness
+
+NUTRITION - target - status
+
+ADAPTATION - proposal, jeśli istnieje
+
+QUICK LOG - szybkie akcje
+
+Nie jest to miejsce na pokazanie każdej możliwej statystyki.
+
+Priorytet: ACTION > INFORMATION.
+
+======================================================================
+14. PLAN
+======================================================================
+
+Plan odpowiada:
+
+CO ROBIĘ W TYM TYGODNIU?
+
+Docelowo: 7-day / później 14-day view.
+
+Każdy dzień: - type - training - sport - recovery/rest - location -
+duration - objective - status
+
+Kliknięcie: DAY → SESSION DETAIL → EXECUTION
+
+Automatic plan generation jest głównym workflow.
+
+Manual creation jest funkcją pomocniczą.
+
+======================================================================
+15. TRAINING
+======================================================================
+
+Training powinien umożliwiać:
+
+PLANNED vs ACTUAL
+
+Per exercise: - sets - reps - weight - RPE - duration where relevant -
+exercise-specific metric.
+
+Workflow:
+
+PLAN → START → LOG → COMPLETE → ANALYZE → RESULT
+
+Po treningu: - pokazujemy wynik, - analizujemy wykonanie, - jeśli jest
+wystarczająca ilość evidence: tworzymy adaptation proposal.
+
+Nie wolno po cichu przepisywać przyszłego planu.
+
+======================================================================
+16. ADAPTATION
+======================================================================
+
+Zasada:
+
+OBSERVE → ANALYZE → EVIDENCE CHECK → PROPOSAL → APPLY ACCORDING TO
+POLICY
+
+Adaptation może dotyczyć: - sets - reps - weight - volume - intensity -
+rest - exercise order - exercise selection - session duration.
+
+RPE z Training Coach może być sygnałem.
+
+Nie jest automatycznie źródłem prawdy.
+
+Jedna obserwacja nie powinna prowadzić do dużych zmian bez
+wystarczającego evidence.
+
+======================================================================
+17. DECISION ENGINE
+======================================================================
+
+Hierarchia:
+
+SAFETY → HEALTH / WELLNESS → USER CONSTRAINTS → GOALS → OPTIMIZATION →
+PREFERENCES
+
+Decision outcomes:
+
+ALLOW MODIFY ASK BLOCK
+
+Autonomy:
+
+GREEN → safe automatic action
+
+YELLOW → suggestion
+
+ORANGE → confirmation
+
+RED → block
+
+Confidence: - high - medium - low
+
+Confidence nie jest gwarancją prawdy.
+
+Ważne decyzje powinny mieć: - decision - factors - source - confidence -
+engine version - context version - outcome - user response.
+
+======================================================================
+18. SAFETY
+======================================================================
+
+EVOLVE jest systemem wellness / fitness / performance.
+
+Nie jest systemem diagnostycznym ani leczniczym.
+
+Nie powinien: - diagnozować, - przepisywać leczenia, - udawać lekarza, -
+przedstawiać niepewnych twierdzeń medycznych jako faktów.
+
+Safety musi być niezależne od: - UI, - planner, - AI.
+
+Minors wymagają age-aware safety i ostrożniejszego traktowania
+health/nutrition/performance.
+
+======================================================================
+19. EXERCISE LIBRARY
+======================================================================
+
+Stary Training Coach jest źródłem wysokiej wartości contentu.
+
+Docelowa struktura ćwiczenia:
+
+-   name
+-   category
+-   movement pattern
+-   muscle groups
+-   difficulty
+-   equipment
+-   location
+-   instructions
+-   tips
+-   common mistakes
+-   alternatives
+-   regression
+-   progression
+-   metric profile
+-   active/inactive.
+
+Nie przenosimy ślepo starych danych.
+
+Usuwamy: - duplikaty, - sprzeczne definicje, - nieaktualne elementy.
+
+Biblioteka ma być wykorzystywana przez planner.
+
+======================================================================
+20. BASKETBALL — PIERWSZY SPORT
+======================================================================
+
+Na początku rozwijamy tylko basketball.
+
+Docelowa struktura:
+
+SPORT → BASKETBALL
+
+SEKCJE: - Overview - Assessment - Training - Drills - Statistics -
+Profile
+
+Profil może obejmować: - position - level - strengths - weaknesses -
+goals - availability.
+
+Obszary: - shooting - three-point - free throw - finishing - ball
+handling - sprint - vertical jump - agility - conditioning - defense
+później.
+
+======================================================================
+21. DRILL LIBRARY
+======================================================================
+
+Stary Training Coach zawiera wartościowe drill content.
+
+Docelowy drill: - name - category - difficulty - objective -
+instructions - duration/reps - equipment - location - measurable
+outcome - progression.
+
+Nie tworzymy fikcyjnych metryk.
+
+======================================================================
+22. BASKETBALL LOGGING
+======================================================================
+
+Przykłady:
+
+SHOOTING - attempts - makes - percentage
+
+FREE THROW - attempts - makes
+
+SPRINT - time
+
+VERTICAL - height
+
+BALL HANDLING - defined completion/error metric where appropriate.
+
+Każdy wynik powinien mieć: - timestamp - source - relevant context -
+ownership.
+
+======================================================================
+23. BASKETBALL STATISTICS
+======================================================================
+
+Progress ma pokazywać:
+
+-   current
+-   previous
+-   trend
+-   observations
+-   latest date.
+
+Nie budujemy wykresów tylko dlatego, że możemy.
+
+Pytania: - co się poprawia? - co stoi? - co się pogarsza? - co powinno
+wpłynąć na plan?
+
+======================================================================
+24. NUTRITION
+======================================================================
+
+Nutrition rozwijamy po Training usability.
+
+MVP: - calories - protein - carbs - fats - fiber where supported -
+water - meals - meal history - targets.
+
+Nutrition Engine jest źródłem prawdy dla obliczeń.
+
+AI Kitchen: - NIE jest obecnie priorytetem. - nie może być źródłem
+prawdy. - musi respektować JWT/ownership. - allergy safety ma priorytet.
+
+Jeżeli użytkownik ma alergię: system nie może polegać na słabym string
+matching.
+
+Docelowo:
+
+CANONICAL MEALS + USER MEALS + MEAL HISTORY.
+
+Stary hardcoded meal catalog powinien zostać zastąpiony kontrolowanym
+katalogiem.
+
+======================================================================
+25. RECOVERY
+======================================================================
+
+Aktualna baza: - fatigue - soreness - energy - stress - recovery
+check-in - readiness.
+
+Readiness jest deterministyczny.
+
+Aktualny Readiness v1: score = 11 - (fatigue + soreness) / 2
+
+Energy/stress mogą być przechowywane bez wpływu na wynik, dopóki nie
+zostanie opracowana i zweryfikowana nowa wersja silnika.
+
+Readiness: - score - freshness - completeness - confidence -
+calculationVersion - factors.
+
+Później: - sleep - wearable - personal baseline - recovery debt -
+readiness forecast.
+
+======================================================================
+26. PROGRESS
+======================================================================
+
+Progress powinien konsumować prawdziwe dane.
+
+Obszary: - body - training - basketball - nutrition - recovery - goals.
+
+Nie budujemy dashboardu “wszystko naraz”.
+
+Najważniejsze: WHAT CHANGED?
+
+W przyszłości: - What Changed? - Personal Baseline - trends - pattern
+discovery.
+
+Korelacja nie może być prezentowana jako pewna przyczynowość.
+
+======================================================================
+27. HISTORY / EVENTS
+======================================================================
+
+Docelowo historia jest append-only.
+
+Event: - type - timestamp - source - schemaVersion - structured
+payload - context - provenance - reliability where applicable.
+
+Sources: - MANUAL - VOICE - WEARABLE - AI_ASSISTED - IMPORTED.
+
+Correction: - nowe wydarzenie, - correctionOfEventId.
+
+Nie nadpisujemy historii po cichu.
+
+======================================================================
+28. MEMORY
+======================================================================
+
+Docelowo:
+
+PERMANENT FACTS GOALS PREFERENCES BEHAVIORAL PATTERNS PERFORMANCE
+PATTERNS TEMPORARY STATE
+
+Użytkownik ma kontrolę: - view - edit - delete - understand usage.
+
+Memory nie może być ukrytym źródłem decyzji.
+
+======================================================================
+29. AI — ODROCZONE
+======================================================================
+
+AI NIE JEST TERAZ GŁÓWNYM PRIORYTETEM.
+
+Docelowo użytkownik chce: - własny API key / BYOK, - możliwość używania
+własnego AI, - opcjonalny darmowy/default provider, - możliwość
+podłączenia własnego AI Managera.
+
+Nie zakładamy, że zewnętrzny provider będzie zawsze darmowy.
+
+Docelowo architektura:
+
+AI PROVIDER ├── user BYOK ├── optional default/free provider ├──
+local/self-hosted provider └── deterministic fallback
+
+AI nie może być single point of failure.
+
+EVOLVE będzie później integrowany przez API z własnym AI Managerem
+użytkownika.
+
+Nie budujemy teraz: - własnego model routera, - własnego systemu
+agentów, - własnej infrastruktury LLM.
+
+======================================================================
+30. AI COACH — PÓŹNIEJ
+======================================================================
+
+AI Coach może później: - rozumieć naturalny język, - odpowiadać na
+pytania, - wyjaśniać decyzje, - pomagać logować, - podsumowywać
+historię, - pomagać planować, - korzystać z Context Engine.
+
+AI musi otrzymywać kontrolowany context, a nie całą bazę danych.
+
+======================================================================
+31. AKCEPTOWANE INNOWACJE — LONG TERM
+======================================================================
+
+Zaakceptowane do długoterminowej roadmapy:
+
+1.  Personal Performance Twin
+2.  Personal Experiments Lab
+3.  Pattern Discovery Engine
+4.  Automatic Plan Adaptation
+5.  Goal Conflict Resolver
+6.  Decision Memory
+7.  Decision Simulator
+8.  Future Load Planner
+9.  Readiness Forecast
+10. Recovery Debt
+11. Adaptive Goals
+12. Natural Language Logging
+13. Voice Coach
+14. Food Vision
+15. Sport Performance Model
+16. AI Agent Teams
+17. User-Controlled Autonomy
+18. Safety Explainability
+19. Challenge My Plan
+20. Personal Baseline
+21. Long-Term Life Context
+22. Computer / Device Integration
+23. Offline-First EVOLVE
+24. Private AI Mode
+25. Self-Evaluation Engine
+26. Evaluation Lab
+27. Model Fallback System
+28. What Changed?
+29. What If? Simulator
+30. EVOLVE Performance OS
+
+Innowacje są zatwierdzone jako kierunek, ale nie oznacza to, że należy
+je wdrażać teraz.
+
+======================================================================
+32. GAMIFICATION
+======================================================================
+
+Gamification jest drugorzędna.
+
+Może obejmować: - XP - levels - achievements - streaks - milestones.
+
+Nie może: - nagradzać trenowania mimo bólu, - karać za odpoczynek, -
+karać za recovery, - zachęcać do niezdrowych zachowań.
+
+Gamification ma być background layer, nie głównym UX.
+
+======================================================================
+33. INFORMATION ARCHITECTURE
+======================================================================
+
+Docelowy desktop:
+
+SIDEBAR
+
+1.  Mój dzień
+2.  Plan
+3.  Trening
+4.  Sport
+5.  Dieta
+6.  Postępy
+7.  Historia
+8.  Profil
+
+Top bar: - kontekst/datę, - status, - notifications, - account.
+
+Mobile: - uproszczona bottom navigation - szybkie akcje.
+
+Mój dzień jest default route.
+
+COACH pozostaje przyszłą funkcją AI i nie powinien być sztucznie udawany
+jako gotowy moduł.
+
+======================================================================
+34. UX / UI
+======================================================================
+
+Docelowy charakter:
+
+-   premium performance platform
+-   minimalist
+-   calm
+-   technical
+-   approachable
+-   readable
+-   strong hierarchy
+-   desktop-friendly
+-   mobile-friendly.
+
+Unikać: - gym-bro aesthetic, - excessive neon, - robot mascot, -
+chaos, - excessive cards, - empty dashboards.
+
+Każda ważna strona musi mieć: - loading - empty - error - success -
+partial data where relevant.
+
+Najważniejsza zasada UX:
+
+ACTION > INFORMATION.
+
+======================================================================
+35. PWA / OFFLINE
+======================================================================
+
+Platforma: - responsive Web - PWA.
+
+Później: - iOS - Android - HealthKit - Health Connect - wearables.
+
+Offline candidates: - workout execution - workout logging - basic
+check-in - selected cached data.
+
+Synchronizacja musi być bezpieczna i deterministyczna.
+
+======================================================================
+36. MASTER ROADMAP
+======================================================================
+
+MASTER ROADMAP — LONG TERM:
+
+FOUNDATION → PROFILE / GOALS / ONBOARDING → TODAY → RECOVERY / READINESS
+→ EVENTS / HISTORY → TRAINING → DATA QUALITY → DECISION CONTEXT →
+DECISION ENGINE → SAFETY → ADAPTATION → NUTRITION → RECOVERY 2.0 →
+PROGRESS → GOALS INTELLIGENCE → MEMORY → PATTERN DISCOVERY → PERSONAL
+BASELINE / PERFORMANCE TWIN → SPORTS INTELLIGENCE → EXPERIMENTS → AI →
+ADVANCED OS.
+
+Nie jest to lista do wykonywania jeden po drugim bez adaptacji.
+
+======================================================================
+37. ACTIVE BUILD ROADMAP — OBECNA
+======================================================================
+
+To jest najważniejsza część dla aktualnego developmentu.
+
+SPRINT 0 Transformation Audit STATUS: COMPLETE
+
+SPRINT 1 Security + Planner + Core foundations STATUS: COMPLETE /
+INTEGRATED
+
+SPRINT 2 Security Closure + Planner 2.0 + Availability + Today backend
+STATUS: COMPLETE WITH LIMITATIONS
+
+  -----------------------------------
+  CURRENT PRIORITY 1
+  TODAY + PLAN FRONTEND INTEGRATION
+  -----------------------------------
+
+Cel:
+
+Backend capabilities muszą stać się rzeczywistym UX.
+
+Implementujemy: - Mój Dzień consuming primary_action - Why Today -
+nutrition targets - sport indication - recovery state - Plan week view -
+7-day summary - day expansion - navigation to training.
+
+Acceptance: REGISTER → PLAN → TODAY działa bez ręcznego obchodzenia
+systemu.
+
+  -----------------------------------
+  CURRENT PRIORITY 2
+  TRAINING EXECUTION VERTICAL SLICE
+  -----------------------------------
+
+Cel:
+
+Użytkownik musi móc faktycznie wykonać zaplanowany trening.
+
+Flow:
+
+PLAN → TODAY → START → EXERCISE → SETS / REPS / WEIGHT / RPE → COMPLETE
+→ RESULT → HISTORY
+
+Nie budować jeszcze wszystkich możliwych metryk.
+
+Najpierw: - smooth execution, - reliable save, - actual vs planned, -
+completion.
+
+  ------------------------------------
+  CURRENT PRIORITY 3
+  EXERCISE LIBRARY + PLANNER QUALITY
+  ------------------------------------
+
+Cel:
+
+Portować i uporządkować wartościowe exercise content z Training Coach.
+
+Implementacja: - structured metadata - difficulty - equipment -
+location - instructions - alternatives - progression.
+
+Następnie użyć tych danych w plannerze.
+
+  ---------------------------
+  CURRENT PRIORITY 4
+  BASKETBALL VERTICAL SLICE
+  ---------------------------
+
+Nie budujemy od razu całego Sports OS.
+
+Budujemy:
+
+BASKETBALL → PROFILE → ASSESSMENT → DRILLS → LOG RESULT → STATISTICS →
+PLAN INTEGRATION
+
+Pierwszy cel: użytkownik może wykonać, zapisać i zobaczyć wynik jednej
+rzeczywistej kategorii koszykarskiej.
+
+Następnie rozszerzamy.
+
+  --------------------------
+  CURRENT PRIORITY 5
+  NUTRITION VERTICAL SLICE
+  --------------------------
+
+Najpierw: - daily target - meals - logging - history - macros - allergy
+safety.
+
+Później: - meal catalog - recipes - meal planning - AI Kitchen.
+
+  --------------------
+  CURRENT PRIORITY 6
+  PROGRESS + PROFILE
+  --------------------
+
+Progress: - body - training - basketball - nutrition - recovery.
+
+Profile: - personal - goals - training - sport - equipment - locations -
+availability - nutrition - preferences.
+
+Każde pole musi być używane albo jawnie odroczone.
+
+  --------------------
+  CURRENT PRIORITY 7
+  ADAPTATION LOOP
+  --------------------
+
+Po stabilnym Training vertical slice:
+
+LOG → OUTCOME → RESPONSE ANALYSIS → EVIDENCE CHECK → ADAPTATION PROPOSAL
+→ ACCEPT / REJECT / APPLY → NEXT PLAN.
+
+  ----------------------------------------
+  CURRENT PRIORITY 8
+  HOSTILE PRODUCT / SECURITY / DATA GATE
+  ----------------------------------------
+
+Po kilku vertical slices: - full regression, - security, - ownership, -
+timezone, - data consistency, - planner correctness, - UI flow, -
+realistic user scenario.
+
+Dopiero wtedy zamykamy pierwszą dużą bramę MVP.
+
+======================================================================
+38. CO NIE JEST TERAZ PRIORYTETEM
+======================================================================
+
+Nie budujemy teraz:
+
+-   AI Coach
+-   AI Agent Teams
+-   BYOK
+-   AI Manager integration
+-   advanced AI Kitchen
+-   Stripe
+-   Discord
+-   multiple sports
+-   wearables
+-   social features
+-   marketplace
+-   subscriptions
+-   advanced gamification
+-   predictive AI
+-   video analysis
+-   food vision
+-   native apps.
+
+Nie oznacza to rezygnacji. Oznacza właściwą kolejność.
+
+======================================================================
+39. MVP DEFINITION OF DONE
+======================================================================
+
+MVP jest gotowe, gdy realny użytkownik może:
+
+1.  utworzyć konto,
+2.  przejść onboarding,
+3.  wykonać mandatory initial assessment,
+4.  ustawić cele,
+5.  ustawić dostępność,
+6.  określić lokalizacje i sprzęt,
+7.  ustawić basketball profile,
+8.  wygenerować automatyczny plan,
+9.  zobaczyć plan tygodnia,
+10. wejść na Mój Dzień,
+11. wiedzieć co robić i dlaczego,
+12. rozpocząć trening,
+13. zapisywać rzeczywiste wyniki,
+14. ukończyć trening,
+15. wykonać recovery check-in,
+16. logować podstawowe nutrition,
+17. zobaczyć progress,
+18. zobaczyć basketball results,
+19. otrzymać bezpieczną adaptation proposal,
+20. zobaczyć historię.
+
+Core product musi działać bez AI.
+
+======================================================================
+40. QUALITY GATE
+======================================================================
+
+Każdy etap przechodzi:
+
+1.  Functional correctness
+2.  Data correctness
+3.  Security
+4.  Ownership / IDOR
+5.  UX
+6.  Architecture
+7.  Tests
+8.  Regression
+9.  Timezone
+10. Safety
+11. Performance where relevant
+12. Explainability where relevant.
+
+“Button exists” ≠ feature done.
+
+“Endpoint exists” ≠ feature done.
+
+“Unit test passes” ≠ end-to-end feature done.
+
+Ważne funkcje: IMPLEMENT → TARGETED TEST → INTEGRATION TEST → REALISTIC
+SCENARIO → BROWSER VERIFICATION where applicable → GATE.
+
+Jeżeli nie można zweryfikować: NOT VERIFIED.
+
+======================================================================
+41. TESTING STANDARD
+======================================================================
+
+Obowiązkowe klasy testów:
+
+UNIT - engines - rules - calculations.
+
+INTEGRATION - API - repositories - ownership - persistence.
+
+SECURITY - account A vs B - unauthorized - forged IDs - ownership.
+
+E2E - real user journey.
+
+TIME - Europe/Warsaw - midnight - week boundary - DST.
+
+PLANNER - frequency - sport days - equipment - location - availability -
+avoid exercises - assessment - recovery.
+
+DATA - null - empty - stale - conflicting - partial.
+
+======================================================================
+42. DEVELOPMENT WORKFLOW
+======================================================================
+
+ChatGPT: - product architect - system architect - roadmap manager -
+reviewer - acceptance authority - risk challenger.
+
+Kilo Code: - repository investigation - implementation - tests -
+reports - controlled refactoring.
+
+Workflow:
+
+CHATGPT → PRECISE KILO PROMPT → IMPLEMENTATION → TESTS → KILO REPORT →
+CHATGPT REVIEW → PASS / REMEDIATION → NEXT SLICE
+
+Kilo nie powinien samodzielnie redefiniować produktu.
+
+Duży prompt jest dopuszczalny, jeśli stanowi jeden spójny vertical slice
+i ma wyraźną kolejność oraz bramki.
+
+Nie łączymy przypadkowo: discovery + massive rewrite + unrelated
+features + final audit.
+
+======================================================================
+43. ARCHITECTURE RULES
+======================================================================
+
+-   domain logic poza UI,
+-   security poza frontendem,
+-   deterministic engines poza LLM,
+-   canonical data source,
+-   controlled projections/read models,
+-   explicit ownership,
+-   versioned important engines,
+-   append-only history where required,
+-   no uncontrolled JSON as universal domain model,
+-   no duplicated business logic,
+-   no hidden side effects,
+-   no provider-specific concepts leaking into core domain.
+
+======================================================================
+44. PRODUCT DECISION RULES
+======================================================================
+
+Jeżeli pojawia się nowy pomysł:
+
+1.  Czy daje realną wartość?
+2.  Czy wspiera core loop?
+3.  Czy wymaga nowej foundation?
+4.  Czy może być prostszy?
+5.  Czy zwiększa ryzyko?
+6.  Czy powinien być teraz czy później?
+7.  Czy koliduje z Master Plan?
+
+Nie budujemy funkcji tylko dlatego, że jest ciekawa.
+
+======================================================================
+45. DŁUGOTERMINOWE FAZY
+======================================================================
+
+PO MVP:
+
+P1 - richer training adaptation - richer nutrition - advanced progress -
+pattern discovery - stronger basketball - memory - personal baseline -
+notification system - controlled gamification.
+
+P2 - AI Coach - BYOK - AI Manager integration - natural language
+logging - voice - food vision - experiments - What Changed? - What If? -
+Personal Performance Twin.
+
+P3 - multiple sports - wearables - native apps - device integration -
+advanced predictive systems - offline-first expansion.
+
+P4 - full EVOLVE Performance OS - AI agent teams - computer/device
+integration - long-term life context - advanced personalization.
+
+======================================================================
+46. SPORTS ROADMAP
+======================================================================
+
+FIRST: Basketball.
+
+LATER: - football - running - volleyball - handball.
+
+Każdy sport docelowo: - physical - technical - cognitive - tactical.
+
+Wyniki sportowe muszą być oparte o konkretne dane/testy.
+
+Nie wolno używać arbitralnego AI score jako źródła prawdy.
+
+======================================================================
+47. DANE I PROVENANCE
+======================================================================
+
+Ważne dane powinny posiadać: - source - timestamp - provenance -
+freshness where relevant - reliability where relevant - schema/version
+where relevant.
+
+Data Quality obejmuje: - completeness - freshness - consistency -
+provenance - reliability.
+
+Brak danych ≠ dobry wynik.
+
+Stare dane ≠ aktualny stan.
+
+AI nie może “uzupełniać” brakujących danych jako faktów.
+
+======================================================================
+48. PERSONAL BASELINE
+======================================================================
+
+Docelowo system powinien coraz częściej porównywać użytkownika do jego
+własnej historii:
+
+CURRENT vs PERSONAL BASELINE.
+
+Nie zakładamy, że norma populacyjna jest odpowiednia dla każdej osoby.
+
+======================================================================
+49. PATTERN DISCOVERY
+======================================================================
+
+Pattern może być uznany za wartościowy tylko gdy ma: - dane, - okres, -
+kontekst, - confidence, - możliwość zakwestionowania, - możliwość
+wygaśnięcia.
+
+Nie: “zrobiłeś X raz, więc X powoduje Y.”
+
+Tak: “w obserwowanym okresie X i Y występowały razem w N przypadkach,
+ale dane nie potwierdzają przyczynowości.”
+
+======================================================================
+50. PERSONAL PERFORMANCE TWIN
+======================================================================
+
+Docelowy model użytkownika może opisywać reakcję na: - training load, -
+recovery, - sleep, - nutrition, - basketball, - schedule.
+
+Nie jest: - diagnozą, - gwarancją wyniku, - magicznym modelem
+przyszłości.
+
+Jest modelem zachowania opartym na danych.
+
+======================================================================
+51. PERSONAL EXPERIMENTS LAB
+======================================================================
+
+Docelowo:
+
+HYPOTHESIS → CONTROLLED CHANGE → OBSERVATION → ANALYSIS → RESULT →
+CONCLUSION.
+
+System powinien ostrzegać, gdy wiele czynników zmienia się jednocześnie
+i nie da się sensownie wyciągnąć wniosku.
+
+======================================================================
+52. WHAT CHANGED?
+======================================================================
+
+Docelowo system może podsumować:
+
+-   co zmieniło się od poprzedniego okresu,
+-   co się poprawiło,
+-   co się pogorszyło,
+-   które cele są bliżej,
+-   jakie decyzje miały wpływ.
+
+Każdy wniosek musi mieć podstawę w danych.
+
+======================================================================
+53. WHAT IF?
+======================================================================
+
+Użytkownik może symulować wariant:
+
+“Co jeśli będę trenował 4 razy zamiast 3?”
+
+System powinien pokazać: - założenia, - przewidywane konsekwencje, -
+kompromisy, - confidence, - ograniczenia.
+
+Nie wolno przedstawiać symulacji jako pewnej przyszłości.
+
+======================================================================
+54. EVALUATION LAB
+======================================================================
+
+Docelowo scenariusze:
+
+-   low recovery,
+-   poor sleep,
+-   high load,
+-   basketball + strength conflict,
+-   missing data,
+-   stale data,
+-   conflicting data,
+-   goal conflict,
+-   user override,
+-   safety,
+-   minors.
+
+Evaluation Lab chroni przed regresją silników.
+
+======================================================================
+55. PRODUKTOWE ANTI-PATTERNS
+======================================================================
+
+Nie robimy:
+
+1.  AI-first core.
+2.  Endless foundation stages.
+3.  Huge dashboard without action.
+4.  Manual workout creation as primary workflow.
+5.  Automatic unsafe adaptation.
+6.  Unverified progression rules.
+7.  Fake personalization.
+8.  Duplicate domain models.
+9.  Client-side authorization.
+10. Hardcoded identity ownership.
+11. Blind import of legacy code.
+12. Multiple sports before basketball is useful.
+13. AI Kitchen before deterministic nutrition is reliable.
+14. Charts without decision value.
+15. 20-week roadmap as a substitute for actual delivery.
+
+======================================================================
+56. DEFINITION OF A GOOD NEXT SLICE
+======================================================================
+
+Każdy kolejny slice powinien:
+
+-   dawać widoczną wartość użytkownikowi,
+-   wykorzystywać istniejące fundamenty,
+-   zamykać rzeczywisty fragment core loop,
+-   mieć jasny zakres,
+-   mieć testy,
+-   mieć acceptance criteria,
+-   kończyć się checkpointem.
+
+Preferujemy:
+
+ONE COMPLETE VERTICAL SLICE
+
+zamiast:
+
+TEN PARTIALLY IMPLEMENTED FEATURES.
+
+======================================================================
+57. CHECKPOINT — STAN NA 2026-10-01
+======================================================================
+
+DONE: - EVOLVE product foundation - auth/security foundation -
+profile/onboarding/goals - Today foundation - recovery/readiness -
+event/history foundation - training foundation - nutrition foundation -
+progress foundation - decision/adaptation architecture - old Training
+Coach audit - transformation audit - verification gate - Transformation
+Sprint 1 - Transformation Sprint 2 - critical security closure - planner
+frequency - equipment filtering - sport-day constraint - plan
+persistence - availability API - Today backend expansion - plan week
+summary - 69 passing tests / 12 skipped / 0 failed
+
+CURRENT: 1. Today frontend integration 2. Plan week UI 3. Training
+execution vertical slice 4. Exercise library restructuring 5. Basketball
+vertical slice 6. Nutrition vertical slice 7. Progress/Profile
+integration 8. Adaptation loop integration 9. final MVP hostile gate
+
+REMAINING BEFORE FIRST REAL-USABLE MVP: - complete end-to-end frontend
+flow, - smooth training execution, - real basketball user flow, -
+reliable basic nutrition, - progress using real data, - profile fields
+actually influencing behavior, - adaptation integrated into real
+workflow, - full browser verification, - final security/data/timezone
+regression, - MVP gate.
+
+LATER: - memory, - pattern discovery, - personal baseline, - advanced
+nutrition, - richer basketball, - AI, - BYOK, - AI Manager, - advanced
+experiments, - Personal Performance Twin, - Performance OS.
+
+======================================================================
+58. FINAL STRATEGIC PRINCIPLE
+======================================================================
+
+The goal is not to build the largest possible fitness application.
+
+The goal is to build a system that becomes increasingly useful because
+it understands the user’s real context and learns from real execution.
+
+The desired experience is:
+
+“I tell EVOLVE who I am, what I want to achieve, when and where I can
+train, what equipment I have and what sport I play.
+
+EVOLVE builds a realistic plan.
+
+Today tells me what to do and why.
+
+I execute.
+
+EVOLVE records what actually happened.
+
+It compares the result with the plan.
+
+It learns how I respond.
+
+It safely proposes what should change.
+
+The next plan becomes better.”
+
+Everything else is secondary.
+
+======================================================================
+END OF EVOLVE MASTER PRODUCT PLAN
+======================================================================

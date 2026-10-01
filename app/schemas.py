@@ -271,6 +271,33 @@ class ExerciseResultRequest(BaseModel):
     session_date: Optional[str] = None  # ISO date; jeśli brak → today
 
 
+class ExerciseSetRequest(BaseModel):
+    """Zaloguj pojedynczą serię w ramach treningu."""
+    exercise_name: str
+    set_number: int = Field(ge=1, description="Numer serii (1-based)")
+    reps: int = Field(ge=1)
+    weight_kg: float = Field(ge=0)
+    rpe: int = Field(ge=1, le=10, description="Rate of Perceived Exertion 1-10")
+    session_date: Optional[str] = None  # ISO date; jeśli brak → today
+
+
+class WorkoutCompleteRequest(BaseModel):
+    """Zamknij sesję treningową — zapisz agregaty i przyznaj XP."""
+    session_date: Optional[str] = None  # ISO date; jeśli brak → today
+    exercises: list[dict]  # [{"exercise_name": str, "sets": int, "reps": int, "weight_kg": float, "rpe": int, "notes": str}]
+    notes: str = ""
+
+
+class WorkoutSessionResponse(BaseModel):
+    id: str
+    session_date: str
+    exercises: list[dict]
+    total_volume_kg: float
+    avg_rpe: float
+    xp_earned: int
+    exercises_count: int
+
+
 class DrillResultRequest(BaseModel):
     """Wynik sesji drilla sportowego z oceną RPE.
     

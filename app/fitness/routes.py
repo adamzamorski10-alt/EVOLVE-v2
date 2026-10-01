@@ -38,7 +38,7 @@ from app.fitness.dashboard import (
     compute_streak_days_from_logs,
     get_user_logs,
 )
-from app.models import DailyLogDB, DrillResultDB, ExerciseResultDB, UserDB
+from app.models import DailyLogDB, DrillResultDB, ExerciseResultDB, ExerciseSetDB, UserDB
 from app.schemas import (
     AppDailyCheckinRequest,
     AppOnboardingRequest,
@@ -47,10 +47,12 @@ from app.schemas import (
     DayItemToggleRequest,
     DrillResultRequest,
     ExerciseResultRequest,
+    ExerciseSetRequest,
     NicknameChangeRequest,
     ProfileUpdateRequest,
     SportConfigRequest,
     WaterLogRequest,
+    WorkoutCompleteRequest,
 )
 from app.fitness.utils import upsert_user_from_profile
 
@@ -412,12 +414,41 @@ def get_today_day_tracker(
     session.commit()
     session.refresh(log)
 
+    # ─── Build primary action ──────────────────────────────────────────────────
+    primary_action = None
+    if plan_workouts_raw:
+        primary_action = {
+            "type": "workout",
+            "title": next(
+                (w.get("title") for w in weekly_plan.get("days", []) if _plan_day_matches(w.get("day"), target_date)),
+                "Trening siłowy",
+            ),
+            "exercises_count": len(plan_workouts_raw),
+            "is_sport_session": next(
+                (w.get("is_sport_session", False) for w in weekly_plan.get("days", []) if _plan_day_matches(w.get("day"), target_date)),
+                False,
+            ),
+        }
+    elif not plan_meals_raw and not plan_workouts_raw:
+        primary_action = {
+            "type": "rest",
+            "title": "Dzień odpoczynku / Aktywna regeneracja",
+            "exercises_count": 0,
+            "is_sport_session": False,
+        }
+
     return {
         "log": log.to_dict(),
         "plan_meals": [_normalize_day_meal(item, source="plan") for item in plan_meals_raw],
         "plan_workouts": [_normalize_day_workout(item, source="plan") for item in plan_workouts_raw],
         "kcal_consumed": kcal_consumed,
         "protein_consumed": protein_consumed,
+        "primary_action": primary_action,
+        "plan_explanation": weekly_plan.get("plan_explanation"),
+        "nutrition_targets": {
+            "kcal": user.calories_target or calc_calories(user),
+            "protein": user.protein_target or calc_protein(user),
+        },
     }
 
 
@@ -1231,6 +1262,158 @@ def get_progression_summary(
         raise HTTPException(status_code=500, detail="Database error — please try again later") from exc
 
 
+@router.post("/exercise-set", tags=["exercise"])
+def log_exercise_set(
+    req: ExerciseSetRequest,
+    user: UserDB = Depends(get_current_user),
+):
+    """Zaloguj pojedynczą serię ćwiczenia w ramach sesji treningowej."""
+    session_date = _resolve_session_date(req.session_date)
+
+    exercise_set = ExerciseSetDB(
+        user_id=user.id,
+        exercise_name=req.exercise_name,
+        session_date=session_date,
+        set_number=req.set_number,
+        reps=req.reps,
+        weight_kg=req.weight_kg,
+        rpe=req.rpe,
+    )
+
+    with Session(engine) as session:
+        session.add(exercise_set)
+        session.commit()
+        session.refresh(exercise_set)
+
+    return {
+        "status": "ok",
+        "set": exercise_set.to_dict(),
+    }
+
+
+@router.post("/workout/complete", tags=["exercise"])
+def complete_workout(
+    req: WorkoutCompleteRequest,
+    user: UserDB = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Zamknij sesję treningową — zapisz agregaty ExerciseResultDB i przyznaj XP."""
+    session_date = _resolve_session_date(req.session_date)
+
+    try:
+        db_user = session.get(UserDB, user.id)
+        if not db_user:
+            raise HTTPException(status_code=404, detail="Użytkownik nie znaleziony")
+
+        results = []
+        total_volume = 0.0
+        rpe_values = []
+
+        for ex in req.exercises:
+            exercise_name = str(ex.get("exercise_name") or "Ćwiczenie")
+            sets = int(ex.get("sets") or 1)
+            reps = int(ex.get("reps") or 1)
+            weight_kg = float(ex.get("weight_kg") or 0)
+            rpe = int(ex.get("rpe") or 1)
+            notes = str(ex.get("notes") or "")
+
+            result = ExerciseResultDB(
+                user_id=db_user.id,
+                exercise_name=exercise_name,
+                session_date=session_date,
+                sets=sets,
+                reps=reps,
+                weight_kg=weight_kg,
+                rpe=rpe,
+                notes=notes,
+            )
+            session.add(result)
+            results.append(result)
+            total_volume += sets * reps * weight_kg
+            rpe_values.append(rpe)
+
+        avg_rpe = round(sum(rpe_values) / len(rpe_values), 1) if rpe_values else 0
+        xp_earned = _XP_WORKOUT_LOGGED
+
+        db_user.total_xp = (db_user.total_xp or 0) + xp_earned
+        db_user.updated_at = datetime.now()
+
+        # Update daily log
+        log = _ensure_day_log(session, db_user.id, session_date)
+        log.workouts_done = (log.workouts_done or 0) + len(req.exercises)
+        log.rpe = int(avg_rpe) if avg_rpe else None
+        session.add(log)
+        session.add(db_user)
+
+        session.commit()
+
+        return {
+            "status": "ok",
+            "session_date": session_date.isoformat(),
+            "exercises": [r.to_dict() for r in results],
+            "total_volume_kg": round(total_volume, 1),
+            "avg_rpe": avg_rpe,
+            "xp_earned": xp_earned,
+            "exercises_count": len(results),
+        }
+    except SQLAlchemyError as exc:
+        session.rollback()
+        raise HTTPException(status_code=500, detail="Database error — please try again later") from exc
+
+
+@router.get("/workout/history", tags=["exercise"])
+def get_workout_history(
+    limit: int = 20,
+    user: UserDB = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Zwraca historię sesji treningowych pogrupowanych po dacie."""
+    try:
+        results = list(
+            session.exec(
+                select(ExerciseResultDB)
+                .where(ExerciseResultDB.user_id == user.id)
+                .order_by(ExerciseResultDB.session_date.desc(), ExerciseResultDB.logged_at.desc())
+            ).all()
+        )[: max(1, min(limit, 200))]
+
+        by_date: dict[str, list[ExerciseResultDB]] = {}
+        for r in results:
+            by_date.setdefault(r.session_date.isoformat(), []).append(r)
+
+        sessions = []
+        for date_str, day_results in sorted(by_date.items(), reverse=True)[:limit]:
+            exercise_summaries = []
+            total_volume = 0.0
+            rpe_values = []
+            for r in day_results:
+                volume = r.sets * r.reps * r.weight_kg
+                total_volume += volume
+                rpe_values.append(r.rpe)
+                exercise_summaries.append({
+                    "exercise_name": r.exercise_name,
+                    "sets": r.sets,
+                    "reps": r.reps,
+                    "weight_kg": r.weight_kg,
+                    "volume_kg": round(volume, 1),
+                    "rpe": r.rpe,
+                    "notes": r.notes or "",
+                })
+
+            avg_rpe = round(sum(rpe_values) / len(rpe_values), 1) if rpe_values else 0
+            sessions.append({
+                "date": date_str,
+                "exercises": exercise_summaries,
+                "exercises_count": len(exercise_summaries),
+                "total_volume_kg": round(total_volume, 1),
+                "avg_rpe": avg_rpe,
+            })
+
+        return {"sessions": sessions}
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=500, detail="Database error — please try again later") from exc
+
+
 @router.post("/water", tags=["checkin"])
 def app_log_water(
     body: WaterLogRequest,
@@ -1501,3 +1684,42 @@ def configure_sport(
             "sport_specialization": db_user.sport_specialization,
             "sport_training_days": db_user.get_list("sport_training_days_json"),
         }
+
+
+class AvailabilityUpdateRequest(BaseModel):
+    availability: dict  # {"Poniedziałek": {"available": true, "time_window": "18:00-20:00", "location": "gym", "equipment": ["sztanga"]}}
+
+
+@router.put("/availability")
+def update_availability(
+    req: AvailabilityUpdateRequest,
+    user: UserDB = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Zapisz dostępność na każdy dzień tygodnia."""
+    db_user = session.get(UserDB, user.id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Użytkownik nie znaleziony")
+    db_user.set_dict("availability_json", req.availability)
+    db_user.updated_at = datetime.now()
+    session.add(db_user)
+    session.commit()
+    session.refresh(db_user)
+    return {
+        "status": "ok",
+        "availability": db_user.get_dict("availability_json"),
+    }
+
+
+@router.get("/availability")
+def get_availability(
+    user: UserDB = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Pobierz zapisaną dostępność."""
+    db_user = session.get(UserDB, user.id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Użytkownik nie znaleziony")
+    return {
+        "availability": db_user.get_dict("availability_json"),
+    }

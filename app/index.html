@@ -1415,6 +1415,94 @@
       display: flex;
       flex-direction: column;
     }
+
+    /* Plan view toggle */
+    .plan-view-toggle {
+      display: inline-flex;
+      gap: 2px;
+      padding: 3px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+    }
+
+    .plan-view-toggle button {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .plan-view-toggle button.active {
+      background: rgba(0, 229, 255, 0.15);
+      color: var(--cyan);
+    }
+
+    /* Week grid cards */
+    .week-grid-card {
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    .week-grid-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(0, 229, 255, 0.3) !important;
+    }
+
+    /* Mobile bottom nav */
+    #mobileBottomNav {
+      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Section loading/error */
+    .section-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+    }
+
+    .section-error {
+      padding: 16px;
+      border-radius: 16px;
+      background: rgba(239, 68, 68, 0.05);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    /* Responsive improvements */
+    @media (max-width: 1024px) {
+      #mainContent {
+        padding-left: 1rem;
+        padding-right: 1rem;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .glass-sidebar {
+        position: fixed;
+        left: -100%;
+        top: 64px;
+        width: 85%;
+        max-width: 280px;
+        height: calc(100vh - 64px);
+        z-index: 999;
+        transition: left 0.3s ease;
+        border-radius: 0 16px 16px 0;
+      }
+
+      .glass-sidebar.open {
+        left: 0;
+      }
+
+      .hide-mobile {
+        display: none !important;
+      }
+    }
   </style>
 </head>
 
@@ -1426,13 +1514,13 @@
       <div class="flex items-center gap-3">
         <div
           class="w-9 h-9 rounded-xl bg-gradient-to-br from-[#00e5ff] to-[#7c3aed] flex items-center justify-center font-bold text-black text-lg shadow-[0_0_20px_rgba(0,229,255,0.4)]">
-          F</div>
-        <span class="font-bold text-white text-xl hidden sm:block" style="font-family:'Syne',sans-serif;">FitAI</span>
+          E</div>
+        <span class="font-bold text-white text-xl hidden sm:block" style="font-family:'Syne',sans-serif;">EVOLVE</span>
       </div>
       <div id="landingLinks" class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-400">
-        <a href="#o-nas" class="hover:text-white transition-colors">O nas</a>
-        <a href="#funkcje" class="hover:text-white transition-colors">Funkcje</a>
-        <a href="#cennik" class="hover:text-white transition-colors">Cennik</a>
+        <a href="#o-nas" class="hover:text-white transition-colors">About</a>
+        <a href="#funkcje" class="hover:text-white transition-colors">Features</a>
+        <a href="#cennik" class="hover:text-white transition-colors">Pricing</a>
       </div>
       <div class="flex items-center gap-3">
         <div id="userSwitcher" class="hidden relative">
@@ -1451,7 +1539,7 @@
             <div class="border-t pt-2" style="border-color:var(--border);">
               <button id="addUserBtn"
                 class="w-full text-left px-3 py-2 text-sm text-cyan-400 hover:bg-white/5 rounded-xl transition-colors font-medium">+
-                Dodaj profil</button>
+                Add profile</button>
             </div>
             <div class="border-t pt-2 mt-1" style="border-color:var(--border);">
               <button onclick="logoutUser()"
@@ -1460,13 +1548,13 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
-                Wyloguj
+                Logout
               </button>
             </div>
           </div>
         </div>
         <button id="panelBtn" onclick="enterDashboard()"
-          class="btn-neon pulse-neon px-5 py-2 rounded-xl text-sm">PANEL</button>
+          class="btn-neon pulse-neon px-5 py-2 rounded-xl text-sm">ENTER</button>
         <button id="mobileMenuBtn" class="md:hidden p-2 btn-ghost rounded-xl">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -1475,6 +1563,9 @@
       </div>
     </div>
   </nav>
+
+  <!-- Mobile sidebar overlay -->
+  <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-[998] hidden md:hidden" onclick="closeMobileSidebar()"></div>
 
   <!-- ======= LANDING PAGE ======= -->
   <div id="landingPage">
@@ -1546,8 +1637,8 @@
             </div>
           </div>
         </div>
-      </div>
-    </section>
+        </div>
+      </section>
 
     <!-- O NAS -->
     <section id="o-nas" class="py-24 px-4 md:px-8 relative">
@@ -1694,82 +1785,98 @@
 
     <!-- SIDEBAR -->
     <aside id="sidebar"
-      class="hidden md:flex w-64 glass-sidebar p-6 border-r fixed top-16 h-[calc(100vh-64px)] flex-col gap-6 overflow-y-auto z-40"
+      class="hidden md:flex w-64 glass-sidebar border-r fixed top-16 h-[calc(100vh-64px)] flex-col gap-5 overflow-y-auto z-40"
       style="border-color:var(--border);">
-      <nav class="space-y-1 flex-1">
-        <p class="px-3 py-1 text-xs font-bold text-gray-600 uppercase tracking-wider">Menu</p>
-        <a href="#" onclick="showTab('home');return false;" data-tab="home"
-          class="nav-item active flex items-center gap-3 p-3 text-sm font-medium text-cyan-400"><span>🏠</span><span>Home</span></a>
-        <a href="#" onclick="showTab('my-day');return false;" data-tab="my-day"
-          class="nav-item flex items-center gap-3 p-3 text-sm font-medium text-gray-400 hover:text-white"><span>📋</span><span>Mój
-            Dzień</span></a>
-
-        <!-- Plan z podzakładkami -->
-        <div class="plan-submenu">
-          <a href="#" onclick="togglePlanSubmenu();return false;"
-            class="nav-item flex items-center gap-3 p-3 text-sm font-medium text-gray-400 hover:text-white">
-            <span>📅</span><span>Plan</span>
-            <span class="ml-auto text-xs transition-transform" id="planSubmenuArrow">▼</span>
-          </a>
-          <div class="plan-subitems" id="planSubitems">
-            <a href="#" onclick="switchPlanCategoryFromMenu('dieta');return false;"
-              class="nav-subitem flex items-center gap-3 pl-8 pr-3 py-2 text-sm font-medium text-gray-400 hover:text-cyan-400">
-              <span>🥗</span><span>Dieta</span>
-            </a>
-            <a href="#" onclick="switchPlanCategoryFromMenu('trening');return false;"
-              class="nav-subitem flex items-center gap-3 pl-8 pr-3 py-2 text-sm font-medium text-gray-400 hover:text-cyan-400">
-              <span>💪</span><span>Trening</span>
-            </a>
-            <a href="#" onclick="switchPlanCategoryFromMenu('sport');return false;"
-              class="nav-subitem flex items-center gap-3 pl-8 pr-3 py-2 text-sm font-medium text-gray-400 hover:text-cyan-400">
-              <span>⚽</span><span>Sport</span>
-            </a>
-          </div>
+      <div class="px-4 pt-4 pb-2">
+        <div class="flex items-center gap-3">
+          <div
+            class="w-9 h-9 rounded-xl bg-gradient-to-br from-[#00e5ff] to-[#7c3aed] flex items-center justify-center font-bold text-black text-lg shadow-[0_0_20px_rgba(0,229,255,0.4)]">
+            E</div>
+          <span class="font-bold text-white text-lg" style="font-family:'Syne',sans-serif;">EVOLVE</span>
         </div>
-
+        <p class="text-[10px] font-bold text-gray-600 uppercase tracking-widest mt-1 pl-1">Training System</p>
+      </div>
+      <nav class="space-y-0.5 flex-1 px-3">
+        <a href="#" onclick="showTab('my-day');return false;" data-tab="my-day"
+          class="nav-item active flex items-center gap-3 p-3 text-sm font-medium text-cyan-400 rounded-xl transition-colors">
+          <span class="text-base">📋</span><span>Today</span></a>
+        <a href="#" onclick="showTab('plan');return false;" data-tab="plan"
+          class="nav-item flex items-center gap-3 p-3 text-sm font-medium text-gray-400 hover:text-white rounded-xl transition-colors">
+          <span class="text-base">📅</span><span>Plan</span></a>
+        <a href="#" onclick="showPlaceholder('training');return false;"
+          class="nav-item flex items-center gap-3 p-3 text-sm font-medium text-gray-400 hover:text-white rounded-xl transition-colors">
+          <span class="text-base">🏋️</span><span>Training</span></a>
+        <a href="#" onclick="showPlaceholder('basketball');return false;"
+          class="nav-item flex items-center gap-3 p-3 text-sm font-medium text-gray-400 hover:text-white rounded-xl transition-colors">
+          <span class="text-base">🏀</span><span>Basketball</span></a>
+        <a href="#" onclick="showPlaceholder('nutrition');return false;"
+          class="nav-item flex items-center gap-3 p-3 text-sm font-medium text-gray-400 hover:text-white rounded-xl transition-colors">
+          <span class="text-base">🥗</span><span>Nutrition</span></a>
+        <a href="#" onclick="showPlaceholder('recovery');return false;"
+          class="nav-item flex items-center gap-3 p-3 text-sm font-medium text-gray-400 hover:text-white rounded-xl transition-colors">
+          <span class="text-base">🧘</span><span>Recovery</span></a>
         <a href="#" onclick="showTab('postepy');return false;" data-tab="postepy"
-          class="nav-item flex items-center gap-3 p-3 text-sm font-medium text-gray-400 hover:text-white"><span>📈</span><span>Postępy</span></a>
+          class="nav-item flex items-center gap-3 p-3 text-sm font-medium text-gray-400 hover:text-white rounded-xl transition-colors">
+          <span class="text-base">📈</span><span>Progress</span></a>
+        <a href="#" onclick="showPlaceholder('history');return false;"
+          class="nav-item flex items-center gap-3 p-3 text-sm font-medium text-gray-400 hover:text-white rounded-xl transition-colors">
+          <span class="text-base">🕒</span><span>History</span></a>
         <a href="#" onclick="showTab('profile');return false;" data-tab="profile"
-          class="nav-item flex items-center gap-3 p-3 text-sm font-medium text-gray-400 hover:text-white"><span>👤</span><span>Profil</span></a>
-        <a href="#" onclick="showTab('contact');return false;" data-tab="contact"
-          class="nav-item flex items-center gap-3 p-3 text-sm font-medium text-gray-400 hover:text-white"><span>💬</span><span>Kontakt</span></a>
-        <a href="#"
-          onclick="showTab('plan'); switchPlanCategory('dieta'); setTimeout(() => switchPlanSubTab('dieta', 'kuchnia'), 50);return false;"
-          data-tab="kuchnia"
-          class="nav-item flex items-center gap-3 p-3 text-sm font-medium text-gray-400 hover:text-white"><span>🤖</span><span>Kuchnia
-            AI</span></a>
+          class="nav-item flex items-center gap-3 p-3 text-sm font-medium text-gray-400 hover:text-white rounded-xl transition-colors">
+          <span class="text-base">👤</span><span>Profile</span></a>
       </nav>
-      <div class="glass rounded-2xl p-4">
-        <p class="text-xs font-bold text-gray-500 uppercase mb-3">Twój Fundament</p>
+      <div class="glass rounded-2xl p-4 mx-3">
+        <p class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-3">Foundation</p>
         <div class="space-y-2 text-xs">
-          <div class="flex justify-between"><span class="text-gray-500">Kalorie/dzień</span><span
+          <div class="flex justify-between"><span class="text-gray-500">Calories</span><span
               class="text-cyan-400 font-bold" id="sidebarCalories">—</span></div>
-          <div class="flex justify-between"><span class="text-gray-500">Białko</span><span
+          <div class="flex justify-between"><span class="text-gray-500">Protein</span><span
               class="text-violet-400 font-bold" id="sidebarProtein">—</span></div>
-          <div class="flex justify-between"><span class="text-gray-500">Waga cel</span><span
+          <div class="flex justify-between"><span class="text-gray-500">Target</span><span
               class="text-yellow-400 font-bold" id="sidebarTarget">—</span></div>
         </div>
       </div>
-      <div class="border-t pt-4" style="border-color:var(--border);">
-        <p class="text-xs text-gray-600 mb-2">FitAI v3.0 Ultimate</p>
-        <div class="flex items-center gap-3 flex-wrap">
-          <button onclick="exitDashboard()" class="text-xs text-gray-500 hover:text-gray-300 transition-colors">← Strona
-            główna</button>
-          <span class="text-gray-700 text-xs">|</span>
+      <div class="border-t px-3 pt-3 pb-4" style="border-color:var(--border);">
+        <p class="text-[10px] text-gray-600 mb-2">EVOLVE v2.0</p>
+        <div class="flex items-center gap-2 flex-wrap">
+          <button onclick="exitDashboard()" class="text-[11px] text-gray-500 hover:text-gray-300 transition-colors">← Landing</button>
           <button onclick="logoutUser()"
-            class="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition-colors font-medium">
+            class="flex items-center gap-1 text-[11px] text-red-400 hover:text-red-300 transition-colors font-medium">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-            Wyloguj
+            Logout
           </button>
         </div>
       </div>
     </aside>
 
+    <!-- MOBILE BOTTOM NAV -->
+    <nav id="mobileBottomNav" class="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-nav border-t px-2 py-1.5"
+      style="border-color:var(--border);">
+      <div class="flex items-center justify-around">
+        <button onclick="showTab('my-day')" class="flex flex-col items-center gap-0.5 p-1 text-cyan-400" data-tab="my-day">
+          <span class="text-lg leading-none">📋</span>
+          <span class="text-[10px] font-medium">Today</span>
+        </button>
+        <button onclick="showTab('plan')" class="flex flex-col items-center gap-0.5 p-1 text-gray-400" data-tab="plan">
+          <span class="text-lg leading-none">📅</span>
+          <span class="text-[10px] font-medium">Plan</span>
+        </button>
+        <button onclick="showTab('postepy')" class="flex flex-col items-center gap-0.5 p-1 text-gray-400" data-tab="postepy">
+          <span class="text-lg leading-none">📈</span>
+          <span class="text-[10px] font-medium">Progress</span>
+        </button>
+        <button onclick="showTab('profile')" class="flex flex-col items-center gap-0.5 p-1 text-gray-400" data-tab="profile">
+          <span class="text-lg leading-none">👤</span>
+          <span class="text-[10px] font-medium">Profile</span>
+        </button>
+      </div>
+    </nav>
+
     <!-- MAIN CONTENT -->
-    <main id="mainContent" class="flex-1 p-4 md:p-8 md:ml-64 w-full overflow-y-auto" style="height:calc(100vh - 64px);">
+    <main id="mainContent" class="flex-1 p-4 md:p-8 md:ml-64 w-full overflow-y-auto pb-20 md:pb-8" style="height:calc(100vh - 64px);">
 
       <!-- Greeting Header -->
       <header class="mb-8">
@@ -1910,22 +2017,21 @@
         <div class="glass rounded-3xl p-5 md:p-6 space-y-5" id="activeDayHeaderCard">
           <div class="flex justify-between items-start flex-wrap gap-3">
             <div>
-              <h3 class="text-3xl font-bold" style="font-family:'Syne',sans-serif;">Mój Dzień</h3>
+              <h3 class="text-3xl font-bold" style="font-family:'Syne',sans-serif;">Today</h3>
               <p class="text-sm text-gray-500 mt-1" id="todayDayLabel">—</p>
               <p class="text-xs text-gray-500 mt-1" id="todayDateLabel">—</p>
             </div>
             <div class="text-right">
-              <p class="text-xs text-gray-500 mb-1">Dzisiejszy postęp</p>
+              <p class="text-xs text-gray-500 mb-1">Daily progress</p>
               <p class="text-2xl font-bold text-cyan-400" style="font-family:'Syne',sans-serif;" id="activeDayProgress">
                 0%</p>
-              <p class="text-xs text-gray-600 mt-1" id="dayProgressCount">0 / 0 zadań</p>
+              <p class="text-xs text-gray-600 mt-1" id="dayProgressCount">0 / 0 tasks</p>
             </div>
           </div>
-
           <div class="grid gap-3 md:grid-cols-2">
             <div class="rounded-2xl p-4" style="background:rgba(0,229,255,0.05);border:1px solid rgba(0,229,255,0.14);">
               <div class="flex items-center justify-between gap-3 mb-2">
-                <p class="text-xs font-bold uppercase tracking-wider text-cyan-200">Kalorie</p>
+                <p class="text-xs font-bold uppercase tracking-wider text-cyan-200">Calories</p>
                 <p class="text-sm font-semibold text-cyan-100" id="dayKcalSummary">0 / 0 kcal</p>
               </div>
               <div class="progress-bar">
@@ -1936,8 +2042,8 @@
             <div class="rounded-2xl p-4"
               style="background:rgba(124,58,237,0.05);border:1px solid rgba(124,58,237,0.14);">
               <div class="flex items-center justify-between gap-3 mb-2">
-                <p class="text-xs font-bold uppercase tracking-wider text-violet-200">Białko</p>
-                <p class="text-sm font-semibold text-violet-100" id="dayProteinSummary">0 / 0 g białka</p>
+                <p class="text-xs font-bold uppercase tracking-wider text-violet-200">Protein</p>
+                <p class="text-sm font-semibold text-violet-100" id="dayProteinSummary">0 / 0 g</p>
               </div>
               <div class="progress-bar">
                 <div id="dayProteinProgressBar" class="progress-fill bg-gradient-to-r from-violet-500 to-fuchsia-500"
@@ -1946,22 +2052,102 @@
             </div>
           </div>
         </div>
+
+        <!-- PRIMARY ACTION -->
+        <div id="todayPrimaryAction" class="hidden">
+          <div class="glass rounded-2xl overflow-hidden" style="border:1px solid rgba(0,229,255,0.2);">
+            <div class="px-5 py-4 flex items-center justify-between"
+              style="background:linear-gradient(135deg,rgba(0,229,255,0.08),rgba(124,58,237,0.08));border-bottom:1px solid rgba(255,255,255,0.07);">
+              <div class="flex items-center gap-3">
+                <span id="todayPrimaryIcon" class="text-2xl">🎯</span>
+                <div>
+                  <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Today's focus</p>
+                  <h4 class="text-base font-bold text-white" style="font-family:'Syne',sans-serif;" id="todayPrimaryTitle">—</h4>
+                </div>
+              </div>
+              <span id="todayPrimaryBadge" class="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider"
+                style="background:rgba(0,229,255,0.15);color:var(--cyan);border:1px solid rgba(0,229,255,0.3);">—</span>
+            </div>
+            <div class="p-5">
+              <div id="todayPrimaryExercises" class="space-y-2"></div>
+              <div class="mt-3 flex items-center gap-2 text-xs text-gray-500">
+                <span id="todayPrimaryTypeIcon">💪</span>
+                <span id="todayPrimaryTypeLabel">Strength session</span>
+                <span class="ml-auto" id="todayPrimaryDuration">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- WHY TODAY -->
+        <div id="todayWhySection" class="hidden">
+          <div class="glass rounded-2xl p-5">
+            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">💡 Why today</p>
+            <p class="text-sm text-gray-300 leading-relaxed" id="todayWhyText"></p>
+          </div>
+        </div>
+
+        <!-- READINESS -->
+        <div id="todayReadinessSection" class="hidden">
+          <div class="glass rounded-2xl p-5">
+            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">⚡ Readiness</p>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3" id="todayReadinessGrid"></div>
+          </div>
+        </div>
+
+        <!-- NUTRITION TARGETS -->
+        <div id="todayNutritionSection" class="hidden">
+          <div class="glass rounded-2xl p-5">
+            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">🥗 Nutrition targets</p>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="rounded-xl p-3" style="background:rgba(0,229,255,0.05);border:1px solid rgba(0,229,255,0.1);">
+                <p class="text-xs text-gray-500 mb-1">Calories</p>
+                <p class="text-xl font-bold text-cyan-400" style="font-family:'Syne',sans-serif;" id="todayTargetKcal">—</p>
+              </div>
+              <div class="rounded-xl p-3" style="background:rgba(124,58,237,0.05);border:1px solid rgba(124,58,237,0.1);">
+                <p class="text-xs text-gray-500 mb-1">Protein</p>
+                <p class="text-xl font-bold text-violet-400" style="font-family:'Syne',sans-serif;" id="todayTargetProtein">—</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RECOVERY -->
+        <div id="todayRecoverySection" class="hidden">
+          <div class="glass rounded-2xl p-5">
+            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">🧘 Recovery</p>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3" id="todayRecoveryGrid"></div>
+          </div>
+        </div>
+
+        <!-- ADAPTATION -->
+        <div id="todayAdaptationSection" class="hidden">
+          <div class="glass rounded-2xl p-5" style="border:1px solid rgba(251,191,36,0.2);background:linear-gradient(135deg,rgba(251,191,36,0.04),rgba(0,0,0,0.2));">
+            <p class="text-xs font-bold text-yellow-400 uppercase tracking-wider mb-2">🔄 Adaptation proposal</p>
+            <p class="text-sm text-gray-300 leading-relaxed" id="todayAdaptationText"></p>
+            <div class="mt-3 flex gap-2">
+              <button onclick="acceptAdaptation()" class="text-xs px-4 py-2 rounded-xl font-bold" style="background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3);">Accept</button>
+              <button onclick="dismissAdaptation()" class="text-xs px-4 py-2 rounded-xl font-bold text-gray-400" style="background:rgba(255,255,255,0.05);border:1px solid var(--border);">Dismiss</button>
+            </div>
+          </div>
+        </div>
+
         <div id="macroAlertBanner" class="hidden alert-warn">
           <p id="macroAlertText" class="text-sm font-medium"></p>
         </div>
         <div class="grid grid-cols-3 gap-3">
           <div class="glass p-4 text-center">
-            <p class="text-xs text-gray-500 mb-1">Kalorie</p>
+            <p class="text-xs text-gray-500 mb-1">Calories</p>
             <p class="text-lg font-bold text-cyan-400" style="font-family:'Syne',sans-serif;"><span
                 id="daySumKcal">0</span> kcal</p>
           </div>
           <div class="glass p-4 text-center">
-            <p class="text-xs text-gray-500 mb-1">Białko</p>
+            <p class="text-xs text-gray-500 mb-1">Protein</p>
             <p class="text-lg font-bold text-violet-400" style="font-family:'Syne',sans-serif;"><span
                 id="daySumProt">0</span>g</p>
           </div>
           <div class="glass p-4 text-center">
-            <p class="text-xs text-gray-500 mb-1">Aktywności</p>
+            <p class="text-xs text-gray-500 mb-1">Activities</p>
             <p class="text-lg font-bold text-yellow-400" style="font-family:'Syne',sans-serif;" id="dayTrainCount">0</p>
           </div>
         </div>
@@ -2574,7 +2760,16 @@
       <section id="tab-plan" class="hidden space-y-6">
         <!-- Plan Header -->
         <div class="flex justify-between items-center flex-wrap gap-4">
-          <h3 class="text-3xl font-bold" style="font-family:'Syne',sans-serif;">Plan Tygodniowy</h3>
+          <div class="flex items-center gap-3">
+            <h3 class="text-3xl font-bold" style="font-family:'Syne',sans-serif;">Plan</h3>
+            <div class="flex gap-1 p-1 rounded-xl"
+              style="background:rgba(255,255,255,0.04);border:1px solid var(--border);">
+              <button onclick="setPlanView('week')" id="planViewWeek" class="text-xs px-3 py-1.5 rounded-lg font-bold transition-all"
+                style="background:rgba(0,229,255,0.15);color:var(--cyan);">Week</button>
+              <button onclick="setPlanView('day')" id="planViewDay" class="text-xs px-3 py-1.5 rounded-lg font-bold transition-all"
+                style="color:var(--muted);">Day</button>
+            </div>
+          </div>
           <div class="flex items-center gap-3">
             <button onclick="generateShoppingList()" class="btn-outline-cyan px-4 py-2 rounded-xl text-xs font-bold">🛒
               Lista Zakupów</button>
@@ -2588,10 +2783,23 @@
           </div>
         </div>
 
-        <!-- Day Carousel -->
-        <div class="glass p-4 overflow-x-auto">
-          <div class="flex gap-2 min-w-max" id="dayCarousel"></div>
+        <!-- WEEK OVERVIEW -->
+        <div id="planWeekOverview" class="space-y-4">
+          <div id="weekSummaryLoading" class="hidden text-center py-8">
+            <div class="inline-block w-6 h-6 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+          <div id="weekSummaryError" class="hidden glass p-4 rounded-2xl border border-red-500/30" style="background:rgba(239,68,68,0.05);">
+            <p class="text-sm text-red-400">Failed to load week overview.</p>
+            <button onclick="loadWeekSummary()" class="mt-2 text-xs text-cyan-400 hover:underline">Retry</button>
+          </div>
+          <div id="weekGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3"></div>
         </div>
+
+        <!-- Day Carousel -->
+        <div id="planDayView" class="space-y-4">
+          <div class="glass p-4 overflow-x-auto">
+            <div class="flex gap-2 min-w-max" id="dayCarousel"></div>
+          </div>
 
         <!-- ═══ HYBRID LAYOUT: Sub-Sidebar + Content Area ═══ -->
         <div id="planHybridLayout">
@@ -3364,7 +3572,6 @@
             </div>
           </div>
         </div>
-
       </section>
 
       <section id="tab-profile" class="hidden space-y-6">
@@ -4327,6 +4534,71 @@
           <div id="subtab-weekly-analysis-content" class="space-y-6"></div>
         </div>
 
+      </section>
+
+      <!-- ====== TAB: AVAILABILITY ====== -->
+      <section id="tab-availability" class="hidden space-y-6">
+        <div class="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h3 class="text-3xl font-bold" style="font-family:'Syne',sans-serif;">Availability</h3>
+            <p class="text-sm text-gray-500 mt-1">Set your weekly availability for training planning.</p>
+          </div>
+          <button onclick="saveAvailability()" class="btn-neon px-5 py-2.5 rounded-xl text-sm font-bold">Save Availability</button>
+        </div>
+        <div id="availabilityLoading" class="hidden text-center py-12">
+          <div class="inline-block w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+          <p class="text-sm text-gray-500 mt-3">Loading availability...</p>
+        </div>
+        <div id="availabilityError" class="hidden glass p-4 rounded-2xl border border-red-500/30" style="background:rgba(239,68,68,0.05);">
+          <p class="text-sm text-red-400" id="availabilityErrorText">Failed to load availability.</p>
+          <button onclick="loadAvailability()" class="mt-2 text-xs text-cyan-400 hover:underline">Retry</button>
+        </div>
+        <div id="availabilityGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+      </section>
+
+      <!-- ====== PLACEHOLDER: TRAINING ====== -->
+      <section id="tab-training" class="hidden space-y-6">
+        <div class="flex flex-col items-center justify-center py-20 text-center">
+          <div class="text-6xl mb-4">🏋️</div>
+          <h3 class="text-2xl font-bold text-white mb-2" style="font-family:'Syne',sans-serif;">Training Execution</h3>
+          <p class="text-sm text-gray-500 max-w-md">The training execution experience is coming next. This is where you'll log sets, reps, and track your strength progress in real time.</p>
+        </div>
+      </section>
+
+      <!-- ====== PLACEHOLDER: BASKETBALL ====== -->
+      <section id="tab-basketball" class="hidden space-y-6">
+        <div class="flex flex-col items-center justify-center py-20 text-center">
+          <div class="text-6xl mb-4">🏀</div>
+          <h3 class="text-2xl font-bold text-white mb-2" style="font-family:'Syne',sans-serif;">Basketball</h3>
+          <p class="text-sm text-gray-500 max-w-md">Drills, shooting workouts, and basketball-specific progress tracking will be available here.</p>
+        </div>
+      </section>
+
+      <!-- ====== PLACEHOLDER: NUTRITION ====== -->
+      <section id="tab-nutrition" class="hidden space-y-6">
+        <div class="flex flex-col items-center justify-center py-20 text-center">
+          <div class="text-6xl mb-4">🥗</div>
+          <h3 class="text-2xl font-bold text-white mb-2" style="font-family:'Syne',sans-serif;">Nutrition</h3>
+          <p class="text-sm text-gray-500 max-w-md">Detailed nutrition tracking, meal planning, and macro analysis will be available here.</p>
+        </div>
+      </section>
+
+      <!-- ====== PLACEHOLDER: RECOVERY ====== -->
+      <section id="tab-recovery" class="hidden space-y-6">
+        <div class="flex flex-col items-center justify-center py-20 text-center">
+          <div class="text-6xl mb-4">🧘</div>
+          <h3 class="text-2xl font-bold text-white mb-2" style="font-family:'Syne',sans-serif;">Recovery</h3>
+          <p class="text-sm text-gray-500 max-w-md">Sleep tracking, recovery metrics, and regeneration planning will be available here.</p>
+        </div>
+      </section>
+
+      <!-- ====== PLACEHOLDER: HISTORY ====== -->
+      <section id="tab-history" class="hidden space-y-6">
+        <div class="flex flex-col items-center justify-center py-20 text-center">
+          <div class="text-6xl mb-4">🕒</div>
+          <h3 class="text-2xl font-bold text-white mb-2" style="font-family:'Syne',sans-serif;">History</h3>
+          <p class="text-sm text-gray-500 max-w-md">Complete training history, past plans, and long-term progress trends will be available here.</p>
+        </div>
       </section>
 
     </main>
@@ -9005,6 +9277,7 @@
         if (curSub === 'atlas') state._trening_rendered = false;
         if (curSub === 'drills') state._sport_rendered = false;
 
+        setPlanView(_planView || 'week');
         renderDayCarousel();
         loadPlanForDay();
         // Always call switchPlanCategory so the left sidebar, top tabs, and content
@@ -9028,9 +9301,48 @@
         initActiveDayFromPlan();
         updateSleepDuration(true);
       }
+      if (tabId === 'availability') {
+        loadAvailability();
+      }
       document.getElementById('mainContent').scrollTop = 0;
+
+      // Close mobile sidebar on navigation
+      if (window.innerWidth < 768) {
+        closeMobileSidebar();
+      }
+
+      // Update mobile bottom nav active state
+      const mobileNav = document.getElementById('mobileBottomNav');
+      if (mobileNav) {
+        mobileNav.querySelectorAll('button').forEach(btn => {
+          const isActive = btn.getAttribute('data-tab') === tabId;
+          btn.classList.toggle('text-cyan-400', isActive);
+          btn.classList.toggle('text-gray-400', !isActive);
+        });
+      }
     }
     window.showTab = showTab;
+
+    function showPlaceholder(page) {
+      const tabMap = {
+        'training': 'tab-training',
+        'basketball': 'tab-basketball',
+        'nutrition': 'tab-nutrition',
+        'recovery': 'tab-recovery',
+        'history': 'tab-history',
+      };
+      const targetId = tabMap[page];
+      if (!targetId) return;
+      document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.add('hidden'));
+      const el = document.getElementById(targetId);
+      if (el) el.classList.remove('hidden');
+      document.querySelectorAll('.nav-item').forEach(n => { n.classList.remove('active', 'text-cyan-400'); n.classList.add('text-gray-400'); });
+      document.getElementById('mainContent').scrollTop = 0;
+      if (window.innerWidth < 768) {
+        closeMobileSidebar();
+      }
+    }
+    window.showPlaceholder = showPlaceholder;
 
     // ========== PLAN SUBTAB ==========
     // ═══════════ PLAN HYBRID NAVIGATION ═══════════
@@ -12612,7 +12924,111 @@
       loadPlanForDay();
     }
     function prevDay() { selectDay((state.currentDay - 1 + 7) % 7); }
-    function nextDay() { selectDay((state.currentDay + 1) % 7); }
+    function nextDay() { selectDay((state.currentDay + 1 + 7) % 7); }
+
+    let _planView = 'week';
+    function setPlanView(view) {
+      _planView = view;
+      const weekOverview = document.getElementById('planWeekOverview');
+      const dayView = document.getElementById('planDayView');
+      const weekBtn = document.getElementById('planViewWeek');
+      const dayBtn = document.getElementById('planViewDay');
+      if (view === 'week') {
+        if (weekOverview) weekOverview.classList.remove('hidden');
+        if (dayView) dayView.classList.add('hidden');
+        if (weekBtn) {
+          weekBtn.style.background = 'rgba(0,229,255,0.15)';
+          weekBtn.style.color = 'var(--cyan)';
+        }
+        if (dayBtn) {
+          dayBtn.style.background = 'rgba(255,255,255,0.03)';
+          dayBtn.style.color = 'var(--muted)';
+        }
+        loadWeekSummary();
+      } else {
+        if (weekOverview) weekOverview.classList.add('hidden');
+        if (dayView) dayView.classList.remove('hidden');
+        if (weekBtn) {
+          weekBtn.style.background = 'rgba(255,255,255,0.03)';
+          weekBtn.style.color = 'var(--muted)';
+        }
+        if (dayBtn) {
+          dayBtn.style.background = 'rgba(0,229,255,0.15)';
+          dayBtn.style.color = 'var(--cyan)';
+        }
+      }
+    }
+    window.setPlanView = setPlanView;
+
+    async function loadWeekSummary() {
+      const grid = document.getElementById('weekGrid');
+      const loading = document.getElementById('weekSummaryLoading');
+      const errorEl = document.getElementById('weekSummaryError');
+      if (!grid) return;
+      grid.innerHTML = '';
+      if (loading) loading.classList.remove('hidden');
+      if (errorEl) errorEl.classList.add('hidden');
+      try {
+        const token = localStorage.getItem('fitai_token');
+        if (!token) throw new Error('Brak tokena logowania');
+        const r = await fetch(`${window.API_BASE}/app/plan/week-summary`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data?.detail || 'Nie udało się pobrać podsumowania tygodnia');
+        renderWeekGrid(data);
+      } catch (e) {
+        if (errorEl) errorEl.classList.remove('hidden');
+      } finally {
+        if (loading) loading.classList.add('hidden');
+      }
+    }
+
+    function renderWeekGrid(data) {
+      const grid = document.getElementById('weekGrid');
+      if (!grid) return;
+      const days = Array.isArray(data?.days) ? data.days : [];
+      const shortDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const fullDays = ['Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota', 'Niedziela'];
+      if (!days.length) {
+        grid.innerHTML = `
+          <div class="col-span-full glass p-6 rounded-2xl text-center">
+            <p class="text-sm text-gray-500">No plan generated yet. Create a plan to see your week overview.</p>
+          </div>`;
+        return;
+      }
+      grid.innerHTML = days.map((d, i) => {
+        const isSport = d.is_sport_session;
+        const hasWorkout = d.has_workout;
+        const hasMeals = d.has_meals;
+        const dayType = d.day_type || 'regular';
+        const accent = isSport ? '#fbbf24' : hasWorkout ? '#00e5ff' : dayType === 'rest' ? '#64748b' : '#a78bfa';
+        const bg = isSport ? 'rgba(251,191,36,0.06)' : hasWorkout ? 'rgba(0,229,255,0.04)' : 'rgba(255,255,255,0.02)';
+        const border = isSport ? 'rgba(251,191,36,0.2)' : hasWorkout ? 'rgba(0,229,255,0.12)' : 'var(--border)';
+        return `
+          <div class="rounded-2xl p-3 cursor-pointer transition-all hover:border-cyan-500/30"
+            style="background:${bg};border:1px solid ${border};"
+            onclick="selectDay(${i})">
+            <div class="flex items-center justify-between mb-2">
+              <div>
+                <p class="text-xs font-bold text-gray-400">${shortDays[i] || ''}</p>
+                <p class="text-sm font-bold text-white">${fullDays[i] || d.day}</p>
+              </div>
+              <span class="text-lg">${isSport ? '🏀' : hasWorkout ? '💪' : dayType === 'rest' ? '😴' : '📋'}</span>
+            </div>
+            <div class="space-y-1">
+              <p class="text-xs text-gray-400 truncate">${d.title || (hasWorkout ? 'Workout' : dayType === 'rest' ? 'Rest day' : 'Active day')}</p>
+              <div class="flex gap-1 flex-wrap">
+                ${hasWorkout ? '<span class="text-[10px] px-1.5 py-0.5 rounded font-bold" style="background:rgba(0,229,255,0.1);color:var(--cyan);">STRENGTH</span>' : ''}
+                ${isSport ? '<span class="text-[10px] px-1.5 py-0.5 rounded font-bold" style="background:rgba(251,191,36,0.1);color:#fbbf24;">BASKETBALL</span>' : ''}
+                ${dayType === 'rest' ? '<span class="text-[10px] px-1.5 py-0.5 rounded font-bold" style="background:rgba(255,255,255,0.05);color:var(--muted);">REST</span>' : ''}
+                ${dayType === 'light' ? '<span class="text-[10px] px-1.5 py-0.5 rounded font-bold" style="background:rgba(124,58,237,0.1);color:#a78bfa;">LIGHT</span>' : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
 
     // Store current plan items for modal access
     state._planMeals = [];
@@ -18095,8 +18511,19 @@
 
     // Mobile menu
     document.getElementById('mobileMenuBtn').addEventListener('click', () => {
-      document.getElementById('sidebar').classList.toggle('open');
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebarOverlay');
+      sidebar.classList.toggle('open');
+      if (overlay) overlay.classList.toggle('hidden');
     });
+
+    function closeMobileSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebarOverlay');
+      if (sidebar) sidebar.classList.remove('open');
+      if (overlay) overlay.classList.add('hidden');
+    }
+    window.closeMobileSidebar = closeMobileSidebar;
 
     // Close modal on backdrop click
     document.getElementById('expandModal').addEventListener('click', function (e) {
@@ -21232,10 +21659,10 @@
       console.log('[KitchenGenerate] State token:', state.token);
       console.log('[KitchenGenerate] LocalStorage token:', localStorage.getItem('fitai_token'));
 
-      // ─ Walidacja: musi być identity_id ─
-      if (!identityId || identityId === '') {
-        showToast('⚠️ Nie udało się zidentyfikować użytkownika. Odśwież stronę.');
-        console.error('[KitchenGenerate] ERROR: No identityId available!', { identityId, token });
+      // ─ Walidacja: token JWT wymagany ─
+      if (!token) {
+        showToast('⚠️ Brak tokena autoryzacji. Zaloguj się ponownie.');
+        console.error('[KitchenGenerate] ERROR: No JWT token available!', { identityId, token });
         return;
       }
       if (_kitchen.fridgeTags.length === 0) {
@@ -21286,18 +21713,12 @@
       try {
         const _apiBase = window.API_BASE || "http://localhost:8000";
 
-        // Build headers with Authorization (optional, for future JWT support)
+        // Build headers with Authorization (JWT required)
         const headers = { 'Content-Type': 'application/json' };
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-          console.log('[KitchenGenerate] Authorization header added');
-        } else {
-          console.log('[KitchenGenerate] Note: No JWT token, using identity_id authentication');
-
-        }
+        headers['Authorization'] = `Bearer ${token}`;
+        console.log('[KitchenGenerate] Authorization header added');
 
         const payload = {
-          identity_id: identityId,
           ingredients: _kitchen.fridgeTags,
           extra_context: document.getElementById('fridgeContext')?.value || '',
           strict_mode: _kitchen.strictMode,
@@ -21494,7 +21915,6 @@
           method: 'POST',
           headers,
           body: JSON.stringify({
-            identity_id: identityId,
             ingredients: _kitchen.fridgeTags,
             extra_context: document.getElementById('fridgeContext')?.value || '',
             strict_mode: _kitchen.strictMode,
@@ -24613,6 +25033,286 @@
         }
       }
 
+      // ========== AVAILABILITY ==========
+      async function loadAvailability() {
+        const grid = document.getElementById('availabilityGrid');
+        const loading = document.getElementById('availabilityLoading');
+        const errorEl = document.getElementById('availabilityError');
+        if (!grid) return;
+        grid.innerHTML = '';
+        if (loading) loading.classList.remove('hidden');
+        if (errorEl) errorEl.classList.add('hidden');
+        try {
+          const token = localStorage.getItem('fitai_token');
+          if (!token) throw new Error('Brak tokena logowania');
+          const r = await fetch(`${window.API_BASE}/app/availability`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data?.detail || 'Nie udało się pobrać dostępności');
+          renderAvailabilityGrid(data.availability || {});
+        } catch (e) {
+          if (errorEl) {
+            errorEl.classList.remove('hidden');
+            const txt = document.getElementById('availabilityErrorText');
+            if (txt) txt.textContent = e.message || 'Nie udało się załadować dostępności.';
+          }
+        } finally {
+          if (loading) loading.classList.add('hidden');
+        }
+      }
+
+      async function saveAvailability() {
+        try {
+          const token = localStorage.getItem('fitai_token');
+          if (!token) throw new Error('Brak tokena logowania');
+          const days = ['Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota', 'Niedziela'];
+          const availability = {};
+          days.forEach(day => {
+            const checked = document.getElementById(`avail-${day}`)?.checked;
+            const timeWindow = document.getElementById(`avail-time-${day}`)?.value || '';
+            const location = document.getElementById(`avail-location-${day}`)?.value || '';
+            const equipmentRaw = document.getElementById(`avail-equip-${day}`)?.value || '';
+            const equipment = equipmentRaw ? equipmentRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+            availability[day] = { available: !!checked, time_window: timeWindow, location, equipment };
+          });
+          const r = await fetch(`${window.API_BASE}/app/availability`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ availability }),
+          });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data?.detail || 'Nie udało się zapisać dostępności');
+          if (typeof showToast === 'function') showToast('✅ Availability saved');
+        } catch (e) {
+          if (typeof showToast === 'function') showToast('⚠️ ' + (e.message || 'Nie udało się zapisać'));
+        }
+      }
+
+      function renderAvailabilityGrid(availability) {
+        const grid = document.getElementById('availabilityGrid');
+        if (!grid) return;
+        const days = ['Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota', 'Niedziela'];
+        const shortDays = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Niedz'];
+        grid.innerHTML = days.map((day, i) => {
+          const d = availability[day] || {};
+          const isAvailable = d.available !== false;
+          return `
+            <div class="glass rounded-2xl p-4 space-y-3" style="border:1px solid ${isAvailable ? 'rgba(0,229,255,0.2)' : 'var(--border)'};">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm font-bold text-white">${day}</p>
+                  <p class="text-xs text-gray-500">${shortDays[i]}</p>
+                </div>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" id="avail-${day}" ${isAvailable ? 'checked' : ''} class="w-4 h-4 rounded accent-[#00e5ff]">
+                  <span class="text-xs font-medium ${isAvailable ? 'text-cyan-400' : 'text-gray-500'}">${isAvailable ? 'Available' : 'Unavailable'}</span>
+                </label>
+              </div>
+              <div class="space-y-2">
+                <div>
+                  <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Time window</label>
+                  <input type="text" id="avail-time-${day}" value="${d.time_window || ''}" placeholder="e.g. 18:00-20:00"
+                    class="w-full mt-1 px-3 py-2 rounded-xl text-xs outline-none transition-all"
+                    style="background:rgba(255,255,255,0.06);border:1px solid var(--border);color:#fff;"
+                    onfocus="this.style.borderColor='rgba(0,229,255,0.4)'"
+                    onblur="this.style.borderColor='var(--border)'">
+                </div>
+                <div>
+                  <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Location</label>
+                  <input type="text" id="avail-location-${day}" value="${d.location || ''}" placeholder="gym / home / outdoor"
+                    class="w-full mt-1 px-3 py-2 rounded-xl text-xs outline-none transition-all"
+                    style="background:rgba(255,255,255,0.06);border:1px solid var(--border);color:#fff;"
+                    onfocus="this.style.borderColor='rgba(0,229,255,0.4)'"
+                    onblur="this.style.borderColor='var(--border)'">
+                </div>
+                <div>
+                  <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Equipment (comma separated)</label>
+                  <input type="text" id="avail-equip-${day}" value="${(d.equipment || []).join(', ')}" placeholder="sztanga, hantle, mata"
+                    class="w-full mt-1 px-3 py-2 rounded-xl text-xs outline-none transition-all"
+                    style="background:rgba(255,255,255,0.06);border:1px solid var(--border);color:#fff;"
+                    onfocus="this.style.borderColor='rgba(0,229,255,0.4)'"
+                    onblur="this.style.borderColor='var(--border)'">
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      async function loadTodayBackendData() {
+        try {
+          const token = localStorage.getItem('fitai_token');
+          if (!token) return;
+          const r = await fetch(`${window.API_BASE}/app/day/today`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data?.detail || 'Failed to load today');
+          renderTodayBackendSections(data);
+        } catch (e) {
+          console.warn('[EVOLVE] loadTodayBackendData failed:', e);
+        }
+      }
+
+      function renderTodayBackendSections(data) {
+        const primary = data?.primary_action;
+        const planExplanation = data?.plan_explanation;
+        const nutritionTargets = data?.nutrition_targets;
+        const log = data?.log || {};
+        const planWorkouts = Array.isArray(data?.plan_workouts) ? data.plan_workouts : [];
+
+        // Primary Action
+        const primarySection = document.getElementById('todayPrimaryAction');
+        const primaryTitle = document.getElementById('todayPrimaryTitle');
+        const primaryBadge = document.getElementById('todayPrimaryBadge');
+        const primaryIcon = document.getElementById('todayPrimaryIcon');
+        const primaryExercises = document.getElementById('todayPrimaryExercises');
+        const primaryTypeIcon = document.getElementById('todayPrimaryTypeIcon');
+        const primaryTypeLabel = document.getElementById('todayPrimaryTypeLabel');
+        const primaryDuration = document.getElementById('todayPrimaryDuration');
+
+        if (primarySection && primary) {
+          primarySection.classList.remove('hidden');
+          if (primaryTitle) primaryTitle.textContent = primary.title || 'Training';
+          if (primaryIcon) primaryIcon.textContent = primary.is_sport_session ? '🏀' : '💪';
+          if (primaryBadge) {
+            primaryBadge.textContent = primary.is_sport_session ? 'Basketball' : 'Strength';
+            primaryBadge.style.background = primary.is_sport_session ? 'rgba(251,191,36,0.15)' : 'rgba(0,229,255,0.15)';
+            primaryBadge.style.color = primary.is_sport_session ? '#fbbf24' : 'var(--cyan)';
+            primaryBadge.style.borderColor = primary.is_sport_session ? 'rgba(251,191,36,0.3)' : 'rgba(0,229,255,0.3)';
+          }
+          if (primaryExercises) {
+            primaryExercises.innerHTML = planWorkouts.slice(0, 5).map(ex => `
+              <div class="flex items-center justify-between rounded-xl px-3 py-2" style="background:rgba(255,255,255,0.03);border:1px solid var(--border);">
+                <div class="flex items-center gap-2">
+                  <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                  <span class="text-sm text-white">${ex.name}</span>
+                </div>
+                <span class="text-xs text-gray-500">${ex.sets || '?'}×${ex.reps || '?'}</span>
+              </div>
+            `).join('');
+          }
+          if (primaryTypeIcon) primaryTypeIcon.textContent = primary.is_sport_session ? '🏀' : '💪';
+          if (primaryTypeLabel) primaryTypeLabel.textContent = primary.is_sport_session ? 'Basketball session' : 'Strength session';
+          if (primaryDuration) primaryDuration.textContent = `${planWorkouts.length} exercises`;
+        } else if (primarySection) {
+          primarySection.classList.add('hidden');
+        }
+
+        // WHY
+        const whySection = document.getElementById('todayWhySection');
+        const whyText = document.getElementById('todayWhyText');
+        if (whySection && whyText) {
+          if (planExplanation) {
+            whySection.classList.remove('hidden');
+            whyText.textContent = planExplanation;
+          } else {
+            whySection.classList.add('hidden');
+          }
+        }
+
+        // Readiness
+        const readinessSection = document.getElementById('todayReadinessSection');
+        const readinessGrid = document.getElementById('todayReadinessGrid');
+        if (readinessSection && readinessGrid) {
+          const items = [
+            { label: 'Energy', value: log.energy_level, icon: '⚡', max: 10 },
+            { label: 'Stress', value: log.stress_level, icon: '😮‍💨', max: 10 },
+            { label: 'Fatigue', value: log.fatigue_score, icon: '😴', max: 10 },
+            { label: 'Sleep', value: log.sleep_hours, icon: '🌙', max: 12 },
+          ].filter(item => item.value !== null && item.value !== undefined);
+          if (items.length) {
+            readinessSection.classList.remove('hidden');
+            readinessGrid.innerHTML = items.map(item => {
+              const pct = Math.min(100, Math.round((item.value / item.max) * 100));
+              const color = pct >= 70 ? 'text-cyan-400' : pct >= 40 ? 'text-yellow-400' : 'text-red-400';
+              return `
+                <div class="rounded-xl p-3 text-center" style="background:rgba(255,255,255,0.03);border:1px solid var(--border);">
+                  <p class="text-lg mb-1">${item.icon}</p>
+                  <p class="text-lg font-bold ${color}" style="font-family:'Syne',sans-serif;">${item.value}</p>
+                  <p class="text-[10px] text-gray-500 uppercase tracking-wider">${item.label}</p>
+                </div>
+              `;
+            }).join('');
+          } else {
+            readinessSection.classList.add('hidden');
+          }
+        }
+
+        // Nutrition targets
+        const nutritionSection = document.getElementById('todayNutritionSection');
+        const targetKcal = document.getElementById('todayTargetKcal');
+        const targetProtein = document.getElementById('todayTargetProtein');
+        if (nutritionSection && targetKcal && targetProtein) {
+          if (nutritionTargets && (nutritionTargets.kcal || nutritionTargets.protein)) {
+            nutritionSection.classList.remove('hidden');
+            targetKcal.textContent = (nutritionTargets.kcal || 0) + ' kcal';
+            targetProtein.textContent = (nutritionTargets.protein || 0) + 'g';
+          } else {
+            nutritionSection.classList.add('hidden');
+          }
+        }
+
+        // Recovery
+        const recoverySection = document.getElementById('todayRecoverySection');
+        const recoveryGrid = document.getElementById('todayRecoveryGrid');
+        if (recoverySection && recoveryGrid) {
+          const items = [
+            { label: 'Sleep', value: log.sleep_hours, icon: '🌙' },
+            { label: 'Sleep quality', value: log.sleep_quality, icon: '⭐', max: 10 },
+            { label: 'Energy', value: log.energy_level, icon: '⚡', max: 10 },
+          ].filter(item => item.value !== null && item.value !== undefined);
+          if (items.length) {
+            recoverySection.classList.remove('hidden');
+            recoveryGrid.innerHTML = items.map(item => {
+              const display = item.max ? `${item.value}/${item.max}` : `${item.value}h`;
+              return `
+                <div class="rounded-xl p-3 flex items-center gap-3" style="background:rgba(255,255,255,0.03);border:1px solid var(--border);">
+                  <span class="text-lg">${item.icon}</span>
+                  <div>
+                    <p class="text-xs text-gray-500">${item.label}</p>
+                    <p class="text-sm font-bold text-white">${display}</p>
+                  </div>
+                </div>
+              `;
+            }).join('');
+          } else {
+            recoverySection.classList.add('hidden');
+          }
+        }
+
+        // Adaptation (stored in localStorage for now, can be extended when backend supports it)
+        const adaptationKey = 'evolve_adaptation_' + (log.date || new Date().toISOString().slice(0, 10));
+        const adaptation = localStorage.getItem(adaptationKey);
+        const adaptationSection = document.getElementById('todayAdaptationSection');
+        const adaptationText = document.getElementById('todayAdaptationText');
+        if (adaptationSection && adaptationText) {
+          if (adaptation) {
+            adaptationSection.classList.remove('hidden');
+            adaptationText.textContent = adaptation;
+          } else {
+            adaptationSection.classList.add('hidden');
+          }
+        }
+      }
+
+      function acceptAdaptation() {
+        const adaptationKey = 'evolve_adaptation_' + new Date().toISOString().slice(0, 10);
+        localStorage.removeItem(adaptationKey);
+        const section = document.getElementById('todayAdaptationSection');
+        if (section) section.classList.add('hidden');
+        if (typeof showToast === 'function') showToast('✅ Adaptation accepted');
+      }
+
+      function dismissAdaptation() {
+        const adaptationKey = 'evolve_adaptation_' + new Date().toISOString().slice(0, 10);
+        localStorage.removeItem(adaptationKey);
+        const section = document.getElementById('todayAdaptationSection');
+        if (section) section.classList.add('hidden');
+        if (typeof showToast === 'function') showToast('Dismissed');
+      }
+
       function recalcBars(kcalConsumed, proteinConsumed) {
         const kcalTarget = _dayTrackerState.kcalTarget || _dayTrackerGetTargets().kcalTarget;
         const proteinTarget = _dayTrackerState.proteinTarget || _dayTrackerGetTargets().proteinTarget;
@@ -25090,6 +25790,7 @@
 
       function initActiveDayFromPlan() {
         loadTodayData();
+        loadTodayBackendData();
       }
 
       function openAddMealToDay() {

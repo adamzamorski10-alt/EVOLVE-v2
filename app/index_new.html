@@ -21232,10 +21232,10 @@
       console.log('[KitchenGenerate] State token:', state.token);
       console.log('[KitchenGenerate] LocalStorage token:', localStorage.getItem('fitai_token'));
 
-      // ─ Walidacja: musi być identity_id ─
-      if (!identityId || identityId === '') {
-        showToast('⚠️ Nie udało się zidentyfikować użytkownika. Odśwież stronę.');
-        console.error('[KitchenGenerate] ERROR: No identityId available!', { identityId, token });
+      // ─ Walidacja: token JWT wymagany ─
+      if (!token) {
+        showToast('⚠️ Brak tokena autoryzacji. Zaloguj się ponownie.');
+        console.error('[KitchenGenerate] ERROR: No JWT token available!', { identityId, token });
         return;
       }
       if (_kitchen.fridgeTags.length === 0) {
@@ -21286,18 +21286,12 @@
       try {
         const _apiBase = window.API_BASE || "http://localhost:8000";
 
-        // Build headers with Authorization (optional, for future JWT support)
+        // Build headers with Authorization (JWT required)
         const headers = { 'Content-Type': 'application/json' };
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-          console.log('[KitchenGenerate] Authorization header added');
-        } else {
-          console.log('[KitchenGenerate] Note: No JWT token, using identity_id authentication');
-
-        }
+        headers['Authorization'] = `Bearer ${token}`;
+        console.log('[KitchenGenerate] Authorization header added');
 
         const payload = {
-          identity_id: identityId,
           ingredients: _kitchen.fridgeTags,
           extra_context: document.getElementById('fridgeContext')?.value || '',
           strict_mode: _kitchen.strictMode,
@@ -21494,7 +21488,6 @@
           method: 'POST',
           headers,
           body: JSON.stringify({
-            identity_id: identityId,
             ingredients: _kitchen.fridgeTags,
             extra_context: document.getElementById('fridgeContext')?.value || '',
             strict_mode: _kitchen.strictMode,

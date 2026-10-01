@@ -21,7 +21,7 @@ except ImportError:
     genai = None
 import jwt
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from slowapi import Limiter
 from sqlalchemy import text as _text
@@ -29,7 +29,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlmodel import Session, select
 
 from app.auth import _rate_limit_key, get_current_user
-from app.config import AI_RATE_PER_HOUR, AI_RATE_PER_MINUTE, JWT_ALGORITHM, JWT_EXPIRE_MINUTES, JWT_SECRET_KEY
+from app.config import AI_RATE_PER_HOUR, AI_RATE_PER_MINUTE, CRON_SECRET, JWT_ALGORITHM, JWT_EXPIRE_MINUTES, JWT_SECRET_KEY
 from app.database import engine
 from app.models import DailyLogDB, DrillResultDB, ExerciseResultDB, UserDB
 from app.schemas import (
@@ -94,7 +94,6 @@ class InjuryUpdateRequest(BaseModel):
 
 
 class FridgeChefRequest(BaseModel):
-    identity_id: str
     ingredients: list[str]
     extra_context: Optional[str] = None
     strict_mode: bool = False
@@ -499,7 +498,8 @@ def _award_xp(user: UserDB, points: int, session: Session) -> int:
     Zwraca nową sumę XP.
     """
     user.total_xp = (user.total_xp or 0) + points
-    user.updated_at = datetime.now().isoformat()
+    user.updated_at = datetime.now()
+
     session.commit()
     return user.total_xp
 
@@ -1102,11 +1102,72 @@ async def _generate_how_to_ai(exercise_name: str, sport_context: str = "") -> st
     return ""
 
 
+def _frequency_to_days(frequency: str) -> int:
+    """Parse frequency string to approximate training days per week."""
+    freq = (frequency or "").lower()
+    if "codziennie" in freq or "7" in freq:
+        return 7
+    if "5-6" in freq or "5" in freq or "6" in freq:
+        return 5
+    if "3-4" in freq or "3" in freq or "4" in freq:
+        return 4
+    if "1-2" in freq or "1" in freq or "2" in freq:
+        return 2
+    return 4  # default
+
+
+def _equipment_filter_key(available: list[str]) -> tuple[str, ...]:
+    """Normalize available equipment to filter keys."""
+    normalized = []
+    for item in available:
+        item = item.lower().strip()
+        if not item:
+            continue
+        normalized.append(item)
+    return tuple(normalized)
+
+
+def _exercise_matches_equipment(exercise: dict, available_keys: tuple[str, ...]) -> bool:
+    """Check if an exercise can be performed with available equipment.
+    
+    This is a conservative filter: if we cannot determine equipment requirements,
+    we allow the exercise rather than blocking it incorrectly.
+    """
+    if not available_keys:
+        return True  # no restriction
+    
+    ex_name = exercise.get("name", "").lower()
+    
+    # Exercises that ALWAYS require specific equipment (blocked if missing)
+    requires_barbell = any(x in ex_name for x in ["sztangą", "sztanga", "back squat", "front squat"])
+    requires_machine = any(x in ex_name for x in ["na maszynie", "na wyciągu", "leg press", "pec deck", "hammer"])
+    requires_cable = any(x in ex_name for x in ["kabel", "wyciąg", "cable", "drążek"])
+    requires_bench = any(x in ex_name for x in ["na ławce", "na ławka"])
+    requires_pullup = any(x in ex_name for x in ["podciąganie", "drążek"])
+    
+    # Check if user has the required equipment
+    if requires_barbell and not any(k in available_keys for k in ["sztanga", "barbell", "full_gym", "gym"]):
+        return False
+    if requires_machine and not any(k in available_keys for k in ["machines", "gym", "siłownia"]):
+        return False
+    if requires_cable and not any(k in available_keys for k in ["wyciąg", "cable", "gym", "siłownia"]):
+        return False
+    if requires_bench and not any(k in available_keys for k in ["lawka", "bench", "gym", "siłownia"]):
+        return False
+    if requires_pullup and not any(k in available_keys for k in ["drążek", "pullup_bar", "gym", "siłownia"]):
+        return False
+    
+    return True
+
+
 def _build_weekly_plan(user: UserDB) -> dict:
     """
     Buduje tygodniowy plan z Carb Cycling + unikalnymi posiłkami i ćwiczeniami
-    na każdy dzień. Zamiast `i % len(list)` używamy przetasowanego indeksu,
-    dzięki czemu każdy dzień dostaje INNE zestawy posiłków i ćwiczeń.
+    na każdy dzień. Respektuje:
+    - frequency (liczba treningowych)
+    - available_equipment (filtrowanie ćwiczeń)
+    - sport_training_days (dni sportu)
+    - avoid_exercises (unikane ćwiczenia)
     """
     profile = user.to_profile_dict()
     meal_catalog = _default_meal_catalog(profile.get("diet", ""))
@@ -1123,6 +1184,7 @@ def _build_weekly_plan(user: UserDB) -> dict:
     preferred_foods = [x.lower() for x in user.get_list("preferred_foods_json")]
     avoid_foods = [x.lower() for x in user.get_list("avoid_foods_json")]
     avoid_exercises = [x.lower() for x in user.get_list("avoid_exercises_json")]
+    available_equipment = _equipment_filter_key(user.get_list("available_equipment_json"))
 
     # ─── Sport module configuration ───────────────────────────────────────────
     sport_focus = (user.sport_focus or "").lower().strip()
@@ -1137,18 +1199,64 @@ def _build_weekly_plan(user: UserDB) -> dict:
         elif spec_map:
             _sport_drills = next(iter(spec_map.values()))
 
-    week_schedule = [
-        ("Poniedziałek", False), ("Wtorek", False), ("Środa", False),
-        ("Czwartek", False), ("Piątek", False), ("Sobota", False),
-        ("Niedziela", True),
-    ]
+    # ─── Frequency -> training days count ─────────────────────────────────────
+    frequency_days = _frequency_to_days(user.frequency or "")
+    
+    # Build week schedule respecting frequency and sport days
+    all_days = ["Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota", "Niedziela"]
+    rest_day = "Niedziela"
+    
+    # Determine which days are sport days
+    valid_sport_days = {d.strip() for d in sport_days if d.strip() in all_days and d.strip() != rest_day}
+    sport_days_count = len(valid_sport_days) if _sport_drills else 0
+    
+    target_strength_days = max(1, frequency_days - sport_days_count)
+    target_strength_days = max(1, min(target_strength_days, 6))
+    
+    # Determine available training days (non-sport, non-rest)
+    available_for_strength = [d for d in all_days if d != rest_day and d not in valid_sport_days]
+    
+    # If we have sport days, adjust target strength days
+    if sport_days_count > 0:
+        # Sport days count as activity, so reduce strength days accordingly
+        available_for_strength_days = max(1, target_strength_days)
+    else:
+        available_for_strength_days = target_strength_days
+    
+    # Select which days get strength training
+    # Prefer spreading across the week
+    if len(available_for_strength) <= available_for_strength_days:
+        strength_days = set(available_for_strength)
+    else:
+        # Spread across available days
+        step = max(1, len(available_for_strength) // available_for_strength_days)
+        strength_days = set()
+        for i in range(0, len(available_for_strength), step):
+            if len(strength_days) >= available_for_strength_days:
+                break
+            strength_days.add(available_for_strength[i])
+        # Ensure we have exactly the right number
+        while len(strength_days) < available_for_strength_days and available_for_strength:
+            for d in available_for_strength:
+                if d not in strength_days:
+                    strength_days.add(d)
+                    break
+    
+    # Build week_schedule: (day_name, is_rest, is_sport, is_strength)
+    week_schedule = []
+    for day_name in all_days:
+        is_rest = day_name == rest_day
+        is_sport = day_name in valid_sport_days and bool(_sport_drills)
+        is_strength = not is_rest and not is_sport and day_name in strength_days
+        week_schedule.append((day_name, is_rest, is_sport, is_strength))
+    
+    # Count actual training days for macro calculation
+    training_days_count = sum(1 for (_, is_rest, is_sport, is_strength) in week_schedule if is_strength or is_sport)
+
     meal_slots = ["Śniadanie", "Przekąska 1", "Obiad", "Przekąska 2", "Kolacja"]
 
-    # ─── Przetasuj posiłki dla każdego slotu raz na cały tydzień ─────────────
-    # Każdy slot dostaje listę kandydatów w losowej kolejności.
-    # Dzień i bierze kandydata o indeksie i -> brak powtórzeń przez 7 dni
-    # (o ile lista ma >=7 pozycji, co zapewniamy w _default_meal_catalog).
-    rng_seed = hash(user.user_key + datetime.now().strftime("%Y-%W"))  # stały seed dla danego tygodnia
+    # ─── Shuffle meals for each slot ──────────────────────────────────────────
+    rng_seed = hash(user.user_key + datetime.now().strftime("%Y-%W"))
     rng = random.Random(rng_seed)
 
     shuffled_meals: dict[str, list] = {}
@@ -1157,19 +1265,10 @@ def _build_weekly_plan(user: UserDB) -> dict:
         rng.shuffle(candidates)
         shuffled_meals[slot] = candidates
 
-    # ─── Rozdziel partie treningowe na dni ────────────────────────────────────
-    # Budujemy listę partii dla dni treningowych (bez niedzieli i dni sportowych),
-    # żeby każda partia pojawiła się raz i nie powielała sąsiednich.
-    training_days_count = sum(
-        1 for (day_name, is_rest) in week_schedule
-        if not is_rest and not (bool(_sport_drills) and day_name in sport_days)
-    )
-
-    # Rozwiń preferred do rozmiaru liczby dni treningowych - bez powtórzeń o ile możliwe
+    # ─── Expand preferred muscle groups to match training days count ──────────
     if len(preferred) >= training_days_count:
         day_focuses_pool = preferred[:training_days_count]
     else:
-        # Powtarzamy partie, ale tak, żeby sąsiednie dni się nie duplikowały
         day_focuses_pool = []
         prev = None
         extended = preferred * (training_days_count // len(preferred) + 2)
@@ -1180,47 +1279,55 @@ def _build_weekly_plan(user: UserDB) -> dict:
             if len(day_focuses_pool) >= training_days_count:
                 break
 
-    rng.shuffle(day_focuses_pool)  # przetasuj partie - różna kolejność każdego tygodnia
+    rng.shuffle(day_focuses_pool)
     focus_iter = iter(day_focuses_pool)
 
-    # ─── Przetasuj ćwiczenia wewnątrz każdej partii ───────────────────────────
+    # ─── Shuffle exercises within each muscle group + filter by equipment ─────
     shuffled_pool: dict[str, list] = {}
     for key, exercises in pool.items():
-        ex_copy = list(exercises)
+        filtered = [
+            ex for ex in exercises
+            if _exercise_matches_equipment(ex, available_equipment)
+            and not any(a in ex["name"].lower() for a in avoid_exercises)
+        ]
+        # If filtering removes all exercises for a muscle group, keep all (fallback)
+        if not filtered:
+            filtered = list(exercises)
+        ex_copy = list(filtered)
         rng.shuffle(ex_copy)
         shuffled_pool[key] = ex_copy
 
     days = []
-    for day_idx, (day_name, is_rest) in enumerate(week_schedule):
-        is_sport_day = bool(_sport_drills) and (day_name in sport_days)
-
-        # ─── Wyznacz typ dnia i makro ─────────────────────────────────────────
+    for day_idx, (day_name, is_rest, is_sport, is_strength) in enumerate(week_schedule):
+        # ─── Determine day type and macros ─────────────────────────────────────
         if is_rest:
             day_type = "rest"
             focus_key = "odpoczynek"
-        elif is_sport_day:
-            day_type = "heavy"   # sesja sportowa = ciężki dzień kaloryczny
+        elif is_sport:
+            day_type = "heavy"
             focus_key = sport_focus
-        else:
+        elif is_strength:
             raw_focus = next(focus_iter, preferred[0])
-            # Rozwiąż mapowanie (np. ramiona -> barki)
             focus_key = _MUSCLE_MAP.get(raw_focus, raw_focus)
             if focus_key not in pool:
                 focus_key = "klatka"
             day_type = _day_type(day_name, focus_key)
+        else:
+            # Light / active recovery day
+            day_type = "light"
+            focus_key = "aktywna regeneracja"
 
         macros = calc_daily_macros(base_calories, day_type)
 
-        # ─── Ćwiczenia ────────────────────────────────────────────────────────
+        # ─── Exercises ────────────────────────────────────────────────────────
         if is_rest:
             workout_items = []
             workout_title = "Odpoczynek / Aktywna regeneracja"
             is_sport_session = False
-        elif is_sport_day:
+        elif is_sport:
             workout_items = []
             for drill in _sport_drills:
                 how_to = get_how_to(drill["name"], is_drill=True) or drill.get("progression_tip", "")
-                # Jeśli how_to nadal puste i użytkownik ma plan PRO – zapytaj AI
                 if not how_to and _normalize_plan(user.plan or "") == "pro":
                     import asyncio as _asyncio
                     try:
@@ -1228,7 +1335,6 @@ def _build_weekly_plan(user: UserDB) -> dict:
                             _generate_how_to_ai(drill["name"], sport_context=sport_focus)
                         )
                     except RuntimeError:
-                        # Nowa pętla gdy brak bieżącej (np. środowisko sync)
                         how_to = _asyncio.run(
                             _generate_how_to_ai(drill["name"], sport_context=sport_focus)
                         )
@@ -1246,25 +1352,26 @@ def _build_weekly_plan(user: UserDB) -> dict:
             spec_label = sport_spec.title() if sport_spec else "Specjalistyczna"
             workout_title = f"Sesja Sportowa – {sport_focus.title()} ({spec_label})"
             is_sport_session = True
-        else:
-            # Wybierz 4 różne ćwiczenia z przetasowanej partii (brak powtórzeń w dniu)
-            available_ex = [
-                ex for ex in shuffled_pool.get(focus_key, pool.get(focus_key, []))
-                if not any(a in ex["name"].lower() for a in avoid_exercises)
-            ] or shuffled_pool.get(focus_key, pool.get(focus_key, []))
-
+        elif is_strength:
+            # Select 4 exercises from filtered pool for this muscle group
+            available_ex = shuffled_pool.get(focus_key, [])
+            if not available_ex:
+                # Fallback: try any available muscle group
+                for fallback_key in preferred:
+                    if fallback_key in shuffled_pool and shuffled_pool[fallback_key]:
+                        available_ex = shuffled_pool[fallback_key][:4]
+                        focus_key = fallback_key
+                        break
+            
             selected = available_ex[:4]
             workout_items = []
             for ex in selected:
-                # Alternatywy: inne ćwiczenia tej samej partii (nie wybrane) + 1 z innej partii
                 same_group_alts = [a for a in available_ex if a["name"] != ex["name"]]
-                # Dobierz alternatywę z sąsiedniej partii dla urozmaicenia
-                complement_keys = [k for k in preferred if k != focus_key and k in pool]
+                complement_keys = [k for k in preferred if k != focus_key and k in shuffled_pool]
                 if complement_keys:
                     comp_key = complement_keys[day_idx % len(complement_keys)]
-                    same_group_alts.extend(shuffled_pool.get(comp_key, pool.get(comp_key, []))[:1])
+                    same_group_alts.extend(shuffled_pool.get(comp_key, [])[:1])
                 how_to = get_how_to(ex["name"], is_drill=False) or ex.get("how_to", "")
-                # Jeśli how_to nadal puste i użytkownik ma plan PRO – zapytaj AI
                 if not how_to and _normalize_plan(user.plan or "") == "pro":
                     import asyncio as _asyncio
                     try:
@@ -1277,8 +1384,6 @@ def _build_weekly_plan(user: UserDB) -> dict:
                         )
                 workout_items.append({
                     **ex,
-                    # Wzbogać how_to z centralnego słownika; jeśli brak wpisu – zachowaj
-                    # wartość z puli (może być już wypełniona) lub ustaw pusty string.
                     "how_to": how_to,
                     "alternatives": [
                         {"name": a["name"], "sets": a["sets"], "reps": a["reps"]}
@@ -1287,13 +1392,17 @@ def _build_weekly_plan(user: UserDB) -> dict:
                 })
             workout_title = f"Sesja {focus_key.title()}"
             is_sport_session = False
+        else:
+            # No scheduled activity - rest or light recovery
+            workout_items = []
+            workout_title = "Aktywna regeneracja"
+            is_sport_session = False
 
-        # ─── Posiłki ──────────────────────────────────────────────────────────
+        # ─── Meals ─────────────────────────────────────────────────────────────
         meals = []
         for slot in meal_slots:
             candidates = shuffled_meals.get(slot, [])
 
-            # Filtruj preferowane / zakazane
             if preferred_foods:
                 pref_c = [c for c in candidates if any(p in c[0].lower() for p in preferred_foods)]
                 if pref_c:
@@ -1303,7 +1412,6 @@ def _build_weekly_plan(user: UserDB) -> dict:
                 if filtered:
                     candidates = filtered
 
-            # Wybierz posiłek dla tego dnia (day_idx jako indeks w przetasowanej liście)
             if not candidates:
                 candidates = meal_catalog.get(slot, [("Posiłek", 500)])
 
@@ -1327,9 +1435,37 @@ def _build_weekly_plan(user: UserDB) -> dict:
             "meals": meals,
         })
 
+    # ─── Build explanation ─────────────────────────────────────────────────────
+    strength_names = [d for (d, _, is_sport, is_strength) in week_schedule if is_strength]
+    sport_names = [d for (d, _, is_sport, _) in week_schedule if is_sport]
+    rest_names = [d for (d, is_rest, _, _) in week_schedule if is_rest]
+    light_names = [d for (d, is_rest, _, _) in week_schedule if not is_rest and d not in sport_names and d not in strength_names]
+
+    explanation_parts = []
+    explanation_parts.append(
+        f"Cel: {user.goal}. Częstotliwość: {user.frequency}. "
+        f"Plan zawiera {len(strength_names)} treningów siłowych, "
+        f"{len(sport_names)} sesji sportowych ({sport_focus or 'brak'}), "
+        f"{len(rest_names)} dzień odpoczynku, {len(light_names)} aktywna regeneracja."
+    )
+    if sport_names:
+        explanation_parts.append(
+            f"Dni sportowe ({', '.join(sport_names)}) zostały uwzględnione jako pierwsze. "
+            f"Treningi siłowe nie są planowane bezpośrednio przed sesjami sportowymi."
+        )
+    if available_equipment:
+        explanation_parts.append(
+            f"Ćwiczenia dopasowane do dostępnego sprzętu: {', '.join(available_equipment)}."
+        )
+    if avoid_exercises:
+        explanation_parts.append(
+            f"Unikane ćwiczenia: {', '.join(avoid_exercises)}."
+        )
+
     return {
         "generated_at": datetime.now().isoformat(),
         "weekly_goal": user.goal,
+        "plan_explanation": " ".join(explanation_parts),
         "days": days,
     }
 
@@ -1570,7 +1706,6 @@ def _upsert_user_from_profile(
     payload: dict,
     session: Session,
     *,
-    identity_id: Optional[str] = None,
     email: Optional[str] = None,
 ) -> UserDB:
     user = session.exec(select(UserDB).where(UserDB.user_key == user_key)).first()
@@ -1594,8 +1729,6 @@ def _upsert_user_from_profile(
         if field in payload:
             setattr(user, field, payload[field])
 
-    if identity_id:
-        user.identity_id = identity_id
     if email:
         user.email = email
     if not user.start_weight:
@@ -1620,84 +1753,17 @@ def _upsert_user_from_profile(
 
     user.calories_target = calc_calories(user)
     user.protein_target = calc_protein(user)
-    user.updated_at = datetime.now().isoformat()
+    user.updated_at = datetime.now()
+
     session.commit()
     session.refresh(user)
     return user
 
 
-# ─── Auth endpoints ──────────────────────────────────────────────────────────
+# ─── Obsolete legacy user endpoints removed ────────────────────────────────────
+# POST/GET /users/{user_id} and /users/{user_id}/logs were unauthenticated
+# and have been removed. Use /auth/* and /app/* endpoints instead.
 
-
-
-@router.post("/users/{user_id}")
-def create_or_update_user(user_id: str, profile: UserProfile):
-    with Session(engine) as session:
-        user = _upsert_user_from_profile(user_id, profile.model_dump(), session)
-        return {"status": "ok", "user_id": user_id, "calories_target": user.calories_target}
-
-
-@router.get("/users/{user_id}")
-def get_user(user_id: str):
-    with Session(engine) as session:
-        user = _get_user_or_404(user_id, session)
-        return user.to_profile_dict()
-
-
-@router.post("/users/{user_id}/logs")
-def add_log(user_id: str, log: DailyLog):
-    with Session(engine) as session:
-        user = _get_user_or_404(user_id, session)
-        today = date.today().isoformat()
-        existing = session.exec(
-            select(DailyLogDB)
-            .where(DailyLogDB.user_id == user.id)
-            .where(DailyLogDB.log_date == today)
-        ).first()
-        if existing:
-            # ── Upsert (legacy endpoint) ──────────────────────────────────────
-            if log.food:    existing.food    = log.food
-            if log.workout: existing.workout = log.workout
-            if log.mood:    existing.mood    = log.mood
-            if log.weight is not None: existing.weight = log.weight
-            existing.logged_at = datetime.now().isoformat()
-            entry = existing
-        else:
-            entry = DailyLogDB(
-                user_id=user.id, log_date=today,
-                food=log.food, workout=log.workout, mood=log.mood, weight=log.weight,
-            )
-        session.add(entry)
-        if log.weight is not None:
-            user.weight = log.weight
-            user.calories_target = calc_calories(user)
-            user.protein_target = calc_protein(user)
-        user.updated_at = datetime.now().isoformat()
-        session.commit()
-        return {"status": "ok", "log": entry.to_dict()}
-
-
-@router.get("/users/{user_id}/logs")
-def get_logs(user_id: str, limit: int = 30):
-    with Session(engine) as session:
-        user = _get_user_or_404(user_id, session)
-        logs = list(session.exec(
-            select(DailyLogDB)
-            .where(DailyLogDB.user_id == user.id)
-            .order_by(DailyLogDB.log_date.desc())
-        ).all())
-        return {"logs": [l.to_dict() for l in logs[:limit]]}
-
-
-@router.post("/app/link-discord")
-def app_link_discord(payload: DiscordLinkRequest):
-    user_key = _web_user_key(payload.identity_id)
-    with Session(engine) as session:
-        user = _get_user_or_404(user_key, session)
-        user.linked_discord_id = payload.discord_user_id
-        user.updated_at = datetime.now().isoformat()
-        session.commit()
-        return {"status": "ok", "linked_discord_id": payload.discord_user_id}
 
 
 @router.get("/app/reminders", tags=["reminders"])
@@ -1709,13 +1775,19 @@ def app_get_reminders(user: UserDB = Depends(get_current_user)):
 def app_set_reminders(prefs: ReminderPrefsRequest, user: UserDB = Depends(get_current_user)):
     with Session(engine) as session:
         user.set_dict("reminders_json", prefs.model_dump())
-        user.updated_at = datetime.now().isoformat()
+        user.updated_at = datetime.now()
+
         session.commit()
         return {"status": "ok", "reminders": prefs.model_dump()}
 
 
 @router.get("/app/reminders-due")
-def app_reminders_due():
+def app_reminders_due(secret: str = Query(..., description="CRON_SECRET z env")):
+    if secret != CRON_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Nieprawidłowy secret.",
+        )
     today = date.today().isoformat()
     with Session(engine) as session:
         users = list(session.exec(select(UserDB).where(UserDB.user_key.startswith("web:"))).all())
@@ -2187,7 +2259,8 @@ Odpowiedź MUSI być w tym dokładnym formacie JSON (bez żadnego tekstu poza JS
         db_user = session.get(UserDB, user.id)
         if db_user:
             db_user.set_dict("weekly_plan_json", plan)
-            db_user.updated_at = datetime.now().isoformat()
+            db_user.updated_at = datetime.now()
+
             session.commit()
 
     return {
@@ -2314,26 +2387,18 @@ def billing_set_plan(payload: PlanUpdateRequest, user: UserDB = Depends(get_curr
         plan = _normalize_plan(payload.plan)
         user.plan = plan
         user.role = _role_for_plan(plan)
-        user.updated_at = datetime.now().isoformat()
+        user.updated_at = datetime.now()
+
         session.commit()
         return {"status": "ok", "plan": plan, "role": user.role}
 
 
-@router.post("/billing/stripe/webhook", tags=["billing"])
+@router.post("/billing/stripe/webhook", tags=["billing", "disabled"])
 async def stripe_webhook(request: Request):
-    payload = await request.json()
-    identity_id = payload.get("identity_id")
-    if not identity_id:
-        raise HTTPException(status_code=400, detail="Brak identity_id")
-    plan = _normalize_plan(payload.get("plan", "free"))
-    user_key = _web_user_key(identity_id)
-    with Session(engine) as session:
-        user = _get_user_or_404(user_key, session)
-        user.plan = plan
-        user.role = _role_for_plan(plan)
-        user.updated_at = datetime.now().isoformat()
-        session.commit()
-        return {"status": "ok", "plan": plan, "role": user.role}
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Stripe billing is not available in EVOLVE MVP.",
+    )
 
 
 @router.post("/ai/analyze-log", tags=["ai"])
@@ -2393,7 +2458,8 @@ def app_update_injuries(payload: InjuryUpdateRequest, user: UserDB = Depends(get
     """Aktualizuje listę kontuzji użytkownika."""
     with Session(engine) as session:
         user.injuries = ", ".join(i.strip() for i in payload.injuries if i.strip())
-        user.updated_at = datetime.now().isoformat()
+        user.updated_at = datetime.now()
+
         session.commit()
         return {
             "status": "ok",
@@ -2531,14 +2597,14 @@ def app_fridge_chef(request: Request, req: FridgeChefRequest, user: UserDB = Dep
 @router.post("/app/kitchen/generate", tags=["ai_chef"])
 @limiter.limit(AI_RATE_PER_MINUTE)
 @limiter.limit(AI_RATE_PER_HOUR)
-def app_kitchen_generate(request: Request, req: FridgeChefRequest):
+def app_kitchen_generate(request: Request, req: FridgeChefRequest, user: UserDB = Depends(get_current_user)):
     """
     Generuje 4 przepisy na podstawie wybranych składników.
     Zwraca JSON tablica 4 obiektów: { nazwa, składniki, opis, kalorie }
     
-    Uwaga: Zamiast JWT, używa identity_id z payloadu do identyfikacji użytkownika.
+    Uwaga: Używa JWT z tokena Bearer do identyfikacji użytkownika.
     """
-    print(f"[KitchenGenerate] Incoming request: identity_id={req.identity_id}, {len(req.ingredients)} ingredients, strict_mode={req.strict_mode}")
+    print(f"[KitchenGenerate] Incoming request: user={user.id}, {len(req.ingredients)} ingredients, strict_mode={req.strict_mode}")
     
     if not req.ingredients:
         print("[KitchenGenerate] ERROR: Empty ingredients list")
@@ -2549,18 +2615,6 @@ def app_kitchen_generate(request: Request, req: FridgeChefRequest):
 
     try:
         with Session(engine) as session:
-            # ─ Znalezienie user'a po identity_id ─
-            user = session.exec(
-                select(UserDB).where(UserDB.identity_id == req.identity_id)
-            ).first()
-            
-            if not user:
-                print(f"[KitchenGenerate] ERROR: User not found for identity_id={req.identity_id}")
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Użytkownik z identity_id='{req.identity_id}' nie znaleziony. Proszę się zalogować."
-                )
-            
             kcal_target   = user.calories_target or calc_calories(user)
             protein_target = user.protein_target or calc_protein(user)
             avoid_foods   = user.get_list("avoid_foods_json")

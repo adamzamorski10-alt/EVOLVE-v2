@@ -6,13 +6,24 @@ from sqlalchemy import text as _text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session, SQLModel, create_engine
 from app.config import DATABASE_URL
-from app.models import UserDB, UserNumberSequenceDB  # noqa: F401 — rejestruje tabele w metadata
+from app.models import ExerciseSetDB, UserDB, UserNumberSequenceDB  # noqa: F401 — rejestruje tabele w metadata
+
+# For in-memory SQLite we must use StaticPool so every connection shares the
+# same single database. Otherwise each connection gets its own empty DB and
+# TestClient tests see no data.
+_engine_kwargs = {}
+if DATABASE_URL == "sqlite:///:memory:":
+    from sqlalchemy.pool import StaticPool
+    _engine_kwargs["poolclass"] = StaticPool
+    _engine_kwargs["connect_args"] = {"check_same_thread": False}
+elif DATABASE_URL.startswith("sqlite"):
+    _engine_kwargs["connect_args"] = {"check_same_thread": False}
 
 # Create database engine
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
     echo=False,
+    **_engine_kwargs,
 )
 
 from sqlalchemy import event

@@ -17,7 +17,13 @@ import sys
 import time
 import uuid
 import threading
+import pytest
 import requests
+
+pytestmark = pytest.mark.skipif(
+    os.getenv("FITAI_API_URL") is None and os.getenv("RUN_E2E") != "1",
+    reason="E2E tests require a running server (set FITAI_API_URL or RUN_E2E=1)",
+)
 
 # ── Konfiguracja ──────────────────────────────────────────────────────────────
 BASE_URL = os.getenv("FITAI_API_URL", "http://localhost:8000")

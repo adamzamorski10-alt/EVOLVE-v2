@@ -86,6 +86,7 @@ class UserDB(SQLModel, table=True):
     reminders_json: str = '{"email_enabled":true,"discord_enabled":false,"discord_channel_id":null}'
     weekly_plan_json: Optional[str] = None
     substitutes_history_json: str = "{}"
+    availability_json: str = "{}"  # per-day availability: {"Poniedziałek": {"available": true, "time_window": "18:00-20:00", "location": "gym", "equipment": ["sztanga"]}}
     # ─── Sports module ───────────────────────────────────────────────────────
     sport_focus: Optional[str] = None                  # np. "koszykówka"
     sport_specialization: Optional[str] = None         # np. "rzuty"
@@ -111,6 +112,13 @@ class UserDB(SQLModel, table=True):
     exercise_results: list["ExerciseResultDB"] = Relationship(
         sa_relationship=relationship(
             "ExerciseResultDB",
+            back_populates="user",
+            lazy="select",
+        )
+    )
+    exercise_sets: list["ExerciseSetDB"] = Relationship(
+        sa_relationship=relationship(
+            "ExerciseSetDB",
             back_populates="user",
             lazy="select",
         )
@@ -178,6 +186,7 @@ class UserDB(SQLModel, table=True):
             "sport_focus": self.sport_focus,
             "sport_specialization": self.sport_specialization,
             "sport_training_days": self.get_list("sport_training_days_json"),
+            "availability": self.get_dict("availability_json"),
             "total_xp": self.total_xp,
             "level": _xp_to_level(self.total_xp),
             "injuries": [i.strip() for i in self.injuries.split(",") if i.strip()],
@@ -333,6 +342,43 @@ class ExerciseResultDB(SQLModel, table=True):
             "weight_kg": self.weight_kg,
             "rpe": self.rpe,
             "notes": self.notes,
+            "logged_at": self.logged_at.isoformat(),
+        }
+
+
+class ExerciseSetDB(SQLModel, table=True):
+    __tablename__ = "exercise_sets"
+
+    id: Optional[str] = Field(
+        default_factory=lambda: str(_uuid_mod.uuid4()),
+        primary_key=True,
+    )
+    user_id: str = Field(foreign_key="users.id", index=True)
+    exercise_name: str = Field(index=True)
+    session_date: date = Field(index=True)
+    set_number: int
+    reps: int
+    weight_kg: float
+    rpe: int = Field(ge=1, le=10)
+    logged_at: datetime = Field(default_factory=datetime.now)
+
+    user: Optional["UserDB"] = Relationship(
+        sa_relationship=relationship(
+            "UserDB",
+            back_populates="exercise_sets",
+            lazy="select",
+        )
+    )
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "exercise_name": self.exercise_name,
+            "session_date": self.session_date.isoformat(),
+            "set_number": self.set_number,
+            "reps": self.reps,
+            "weight_kg": self.weight_kg,
+            "rpe": self.rpe,
             "logged_at": self.logged_at.isoformat(),
         }
 
