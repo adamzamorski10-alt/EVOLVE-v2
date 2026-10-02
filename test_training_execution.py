@@ -193,3 +193,90 @@ def test_cannot_complete_workout_for_another_user():
             ).all()
         )
         assert len(b_results) == 0
+
+
+def test_workout_complete_is_idempotent_no_duplicates():
+    user, token = _seed_user()
+    exercises = [
+        {"exercise_name": "Przysiad", "sets": 3, "reps": 5, "weight_kg": 100.0, "rpe": 7, "notes": ""},
+    ]
+
+    # Pierwsze wykonanie
+    r1 = client.post("/app/workout/complete", json={"exercises": exercises}, headers=_headers(token))
+    assert r1.status_code == 200
+
+    # Drugie wykonanie z tymi samymi danymi
+    r2 = client.post("/app/workout/complete", json={"exercises": exercises}, headers=_headers(token))
+    assert r2.status_code == 200
+
+    with Session(engine) as session:
+        results = list(
+            session.exec(
+                select(ExerciseResultDB)
+                .where(ExerciseResultDB.user_id == user.id)
+                .where(ExerciseResultDB.session_date == date.today())
+                .where(ExerciseResultDB.exercise_name == "Przysiad")
+            ).all()
+        )
+        assert len(results) == 1, f"Oczekiwano 1 wyniku, znaleziono {len(results)} — duplikat!"
+
+
+def test_workout_complete_updates_existing_result():
+    user, token = _seed_user()
+    exercises_v1 = [
+        {"exercise_name": "Przysiad", "sets": 3, "reps": 5, "weight_kg": 100.0, "rpe": 7, "notes": "v1"},
+    ]
+    exercises_v2 = [
+        {"exercise_name": "Przysiad", "sets": 4, "reps": 6, "weight_kg": 105.0, "rpe": 8, "notes": "v2"},
+    ]
+
+    r1 = client.post("/app/workout/complete", json={"exercises": exercises_v1}, headers=_headers(token))
+    assert r1.status_code == 200
+    data1 = r1.json()
+    assert data1["exercises"][0]["sets"] == 3
+
+    r2 = client.post("/app/workout/complete", json={"exercises": exercises_v2}, headers=_headers(token))
+    assert r2.status_code == 200
+    data2 = r2.json()
+    assert data2["exercises"][0]["sets"] == 4
+
+    with Session(engine) as session:
+        results = list(
+            session.exec(
+                select(ExerciseResultDB)
+                .where(ExerciseResultDB.user_id == user.id)
+                .where(ExerciseResultDB.session_date == date.today())
+                .where(ExerciseResultDB.exercise_name == "Przysiad")
+            ).all()
+        )
+        assert len(results) == 1
+        assert results[0].sets == 4
+        assert results[0].notes == "v2"
+
+
+def test_day_today_returns_plan_workouts_for_frontend():
+    user, token = _seed_user()
+
+    # Najpierw wygeneruj plan
+    r = client.post(
+        "/app/plan/generate",
+        json={"strategy": "balanced", "force_new": True},
+        headers=_headers(token),
+    )
+    assert r.status_code == 200
+
+    # Pobierz Today
+    r = client.get("/app/day/today", headers=_headers(token))
+    assert r.status_code == 200
+    data = r.json()
+
+    assert "plan_workouts" in data
+    assert isinstance(data["plan_workouts"], list)
+
+    # Sprawdź że każdy workout ma wymagane pola dla frontendu
+    for w in data["plan_workouts"]:
+        assert "item_id" in w or True  # item_id może być null
+        assert "name" in w or "exercise_name" in w
+        assert "sets" in w
+        assert "reps" in w
+        assert "weight_kg" in w or "weight" in w

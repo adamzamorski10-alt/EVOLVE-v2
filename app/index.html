@@ -1803,7 +1803,7 @@
         <a href="#" onclick="showTab('plan');return false;" data-tab="plan"
           class="nav-item flex items-center gap-3 p-3 text-sm font-medium text-gray-400 hover:text-white rounded-xl transition-colors">
           <span class="text-base">📅</span><span>Plan</span></a>
-        <a href="#" onclick="showPlaceholder('training');return false;"
+        <a href="#" onclick="showTab('training');return false;" data-tab="training"
           class="nav-item flex items-center gap-3 p-3 text-sm font-medium text-gray-400 hover:text-white rounded-xl transition-colors">
           <span class="text-base">🏋️</span><span>Training</span></a>
         <a href="#" onclick="showPlaceholder('basketball');return false;"
@@ -1818,7 +1818,7 @@
         <a href="#" onclick="showTab('postepy');return false;" data-tab="postepy"
           class="nav-item flex items-center gap-3 p-3 text-sm font-medium text-gray-400 hover:text-white rounded-xl transition-colors">
           <span class="text-base">📈</span><span>Progress</span></a>
-        <a href="#" onclick="showPlaceholder('history');return false;"
+        <a href="#" onclick="showTab('history');return false;" data-tab="history"
           class="nav-item flex items-center gap-3 p-3 text-sm font-medium text-gray-400 hover:text-white rounded-xl transition-colors">
           <span class="text-base">🕒</span><span>History</span></a>
         <a href="#" onclick="showTab('profile');return false;" data-tab="profile"
@@ -4556,12 +4556,85 @@
         <div id="availabilityGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
       </section>
 
-      <!-- ====== PLACEHOLDER: TRAINING ====== -->
+      <!-- ====== TAB: TRAINING ====== -->
       <section id="tab-training" class="hidden space-y-6">
-        <div class="flex flex-col items-center justify-center py-20 text-center">
-          <div class="text-6xl mb-4">🏋️</div>
-          <h3 class="text-2xl font-bold text-white mb-2" style="font-family:'Syne',sans-serif;">Training Execution</h3>
-          <p class="text-sm text-gray-500 max-w-md">The training execution experience is coming next. This is where you'll log sets, reps, and track your strength progress in real time.</p>
+        <div class="glass rounded-3xl p-5 md:p-6 space-y-5">
+          <div class="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 class="text-3xl font-bold" style="font-family:'Syne',sans-serif;">Training</h3>
+              <p class="text-sm text-gray-500 mt-1" id="trainingDayLabel">—</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="loadTrainingPlan()" class="btn-outline-cyan px-4 py-2 rounded-xl text-xs font-bold">🔄 Odśwież</button>
+              <button onclick="showTab('history')" class="btn-outline-cyan px-4 py-2 rounded-xl text-xs font-bold">🕒 Historia</button>
+            </div>
+          </div>
+
+          <!-- IDLE STATE: show plan -->
+          <div id="trainingIdle" class="space-y-4">
+            <div class="rounded-2xl p-4" style="background:rgba(0,229,255,0.05);border:1px solid rgba(0,229,255,0.14);">
+              <p class="text-xs font-bold text-cyan-200 uppercase tracking-wider mb-3">Plan na dziś</p>
+              <div id="trainingPlanList" class="space-y-2">
+                <p class="text-sm text-gray-500 italic text-center py-3">Ładowanie planu...</p>
+              </div>
+            </div>
+            <button id="btnStartWorkout" onclick="startWorkout()" class="hidden w-full btn-neon px-6 py-3 rounded-2xl text-sm font-bold">🏋️ Rozpocznij trening</button>
+          </div>
+
+          <!-- EXECUTION STATE -->
+          <div id="trainingExecution" class="hidden space-y-4">
+            <div class="flex items-center justify-between">
+              <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Ćwiczenie <span id="trainingCurrentIndex">1</span> / <span id="trainingTotalCount">0</span></p>
+              <button onclick="skipCurrentExercise()" class="text-xs px-3 py-1.5 rounded-lg font-bold" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#9ca3af;">Pomiń</button>
+            </div>
+
+            <div class="glass rounded-2xl p-5 space-y-4">
+              <h4 class="text-xl font-bold text-white" id="trainingExName" style="font-family:'Syne',sans-serif;">—</h4>
+              <p class="text-xs text-gray-500" id="trainingExPlanned">Plan: —</p>
+
+              <!-- Sets logger -->
+              <div id="trainingSetsContainer" class="space-y-2"></div>
+
+              <button onclick="addSetRow()" class="text-xs px-3 py-1.5 rounded-lg font-bold" style="background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.25);color:#00e5ff;">➕ Dodaj serię</button>
+
+              <div class="grid grid-cols-2 gap-3 pt-2">
+                <div>
+                  <label class="text-xs text-gray-400 mb-1 block">RPE (1-10)</label>
+                  <input type="number" id="trainingExRpe" min="1" max="10" value="7" class="w-full rounded-xl px-3 py-2 text-sm" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#fff;">
+                </div>
+                <div>
+                  <label class="text-xs text-gray-400 mb-1 block">Notatka (opcjonalnie)</label>
+                  <input type="text" id="trainingExNotes" placeholder="np. ból w łokciu" class="w-full rounded-xl px-3 py-2 text-sm" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#fff;">
+                </div>
+              </div>
+
+              <div class="flex gap-2 pt-2">
+                <button onclick="markExerciseDone()" class="flex-1 btn-neon px-4 py-2.5 rounded-xl text-sm font-bold">✅ Ukończ ćwiczenie</button>
+              </div>
+            </div>
+
+            <button onclick="finishWorkout()" class="w-full px-6 py-3 rounded-2xl text-sm font-bold" style="background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);color:#a78bfa;">🏁 Zakończ trening</button>
+          </div>
+
+          <!-- RESULT STATE -->
+          <div id="trainingResult" class="hidden space-y-4">
+            <div class="text-center py-6">
+              <div class="text-5xl mb-3">🎉</div>
+              <h3 class="text-2xl font-bold text-white" style="font-family:'Syne',sans-serif;">Trening ukończony!</h3>
+              <p class="text-sm text-gray-500 mt-1" id="trainingResultSummary">—</p>
+            </div>
+            <div id="trainingResultDetails" class="space-y-2"></div>
+            <div class="flex gap-2">
+              <button onclick="showTab('history')" class="flex-1 btn-outline-cyan px-4 py-2.5 rounded-xl text-sm font-bold">🕒 Zobacz historię</button>
+              <button onclick="resetTrainingView()" class="flex-1 btn-outline-cyan px-4 py-2.5 rounded-xl text-sm font-bold">📋 Powrót do Planu</button>
+            </div>
+          </div>
+
+          <!-- ERROR -->
+          <div id="trainingError" class="hidden glass p-4 rounded-2xl border border-red-500/30" style="background:rgba(239,68,68,0.05);">
+            <p class="text-sm text-red-400" id="trainingErrorText">—</p>
+            <button onclick="loadTrainingPlan()" class="mt-2 text-xs text-cyan-400 hover:underline">Spróbuj ponownie</button>
+          </div>
         </div>
       </section>
 
@@ -4592,12 +4665,29 @@
         </div>
       </section>
 
-      <!-- ====== PLACEHOLDER: HISTORY ====== -->
+      <!-- ====== TAB: HISTORY ====== -->
       <section id="tab-history" class="hidden space-y-6">
-        <div class="flex flex-col items-center justify-center py-20 text-center">
-          <div class="text-6xl mb-4">🕒</div>
-          <h3 class="text-2xl font-bold text-white mb-2" style="font-family:'Syne',sans-serif;">History</h3>
-          <p class="text-sm text-gray-500 max-w-md">Complete training history, past plans, and long-term progress trends will be available here.</p>
+        <div class="glass rounded-3xl p-5 md:p-6 space-y-5">
+          <div class="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 class="text-3xl font-bold" style="font-family:'Syne',sans-serif;">History</h3>
+              <p class="text-sm text-gray-500 mt-1">Historia treningów i postępy.</p>
+            </div>
+            <button onclick="loadWorkoutHistory()" class="btn-outline-cyan px-4 py-2 rounded-xl text-xs font-bold">🔄 Odśwież</button>
+          </div>
+
+          <div id="historyLoading" class="hidden text-center py-8">
+            <div class="inline-block w-6 h-6 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+
+          <div id="historyError" class="hidden glass p-4 rounded-2xl border border-red-500/30" style="background:rgba(239,68,68,0.05);">
+            <p class="text-sm text-red-400" id="historyErrorText">—</p>
+            <button onclick="loadWorkoutHistory()" class="mt-2 text-xs text-cyan-400 hover:underline">Spróbuj ponownie</button>
+          </div>
+
+          <div id="historyList" class="space-y-3">
+            <p class="text-sm text-gray-500 italic text-center py-3">Ładowanie historii...</p>
+          </div>
         </div>
       </section>
 
@@ -9325,11 +9415,9 @@
 
     function showPlaceholder(page) {
       const tabMap = {
-        'training': 'tab-training',
         'basketball': 'tab-basketball',
         'nutrition': 'tab-nutrition',
         'recovery': 'tab-recovery',
-        'history': 'tab-history',
       };
       const targetId = tabMap[page];
       if (!targetId) return;
@@ -9344,7 +9432,423 @@
     }
     window.showPlaceholder = showPlaceholder;
 
-    // ========== PLAN SUBTAB ==========
+    // ========== TRAINING EXECUTION ==========
+    // ─── Stan sesji treningowej ────────────────────────────────────────────────
+
+    var _trainingExecution = {
+      mode: 'idle', // idle | executing | result
+      exercises: [],
+      currentIndex: 0,
+      setsLogged: [], // [{set_number, reps, weight_kg, rpe}]
+      sessionDate: null,
+      result: null,
+    };
+
+    function startWorkoutFromToday() {
+      const workouts = (_activeDay.exercises || []).filter(Boolean);
+      if (!workouts.length) {
+        showToast('⚠️ Brak ćwiczeń na dziś');
+        return;
+      }
+
+      window._workoutFromToday = workouts.map(ex => ({
+        item_id: ex.item_id || ('ex_' + Date.now() + Math.random().toString(36).slice(2, 6)),
+        name: ex.name || 'Ćwiczenie',
+        sets: Number(ex.sets || 0) || 3,
+        reps: Number(ex.reps || 0) || 10,
+        weight_kg: Number(ex.weight_kg || ex.weight || 0) || 0,
+        rpe: Number(ex.rpe || 7),
+        notes: ex.notes || '',
+        source: ex.source || 'today',
+      }));
+
+      showTab('training');
+      if (typeof showToast === 'function') showToast('🏋️ Przeniesiono plan do Training');
+    }
+    window.startWorkoutFromToday = startWorkoutFromToday;
+
+    async function loadTrainingPlan() {
+      // Jeśli są wczytane dane z Today, użyj ich
+      if (window._workoutFromToday && window._workoutFromToday.length) {
+        _trainingExecution.exercises = window._workoutFromToday;
+        _trainingExecution.sessionDate = new Date().toISOString().slice(0, 10);
+        window._workoutFromToday = null;
+
+        const dayLabel = document.getElementById('trainingDayLabel');
+        if (dayLabel) dayLabel.textContent = new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+
+        const listEl = document.getElementById('trainingPlanList');
+        const btnStart = document.getElementById('btnStartWorkout');
+        const errorEl = document.getElementById('trainingError');
+        if (errorEl) errorEl.classList.add('hidden');
+
+        if (listEl) {
+          listEl.innerHTML = _trainingExecution.exercises.map((ex, i) => `
+            <div class="flex items-center justify-between p-3 rounded-xl" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);">
+              <div>
+                <p class="text-sm font-medium text-white">${escapeHTML ? escapeHTML(ex.name) : ex.name}</p>
+                <p class="text-xs text-gray-500">${ex.sets}×${ex.reps} ${ex.weight_kg > 0 ? ('@ ' + ex.weight_kg + 'kg') : 'BW'} · RPE ${ex.rpe}</p>
+              </div>
+              <span class="text-xs text-gray-600">#${i + 1}</span>
+            </div>
+          `).join('');
+        }
+        if (btnStart) btnStart.classList.remove('hidden');
+        return;
+      }
+
+      const errorEl = document.getElementById('trainingError');
+      const errorText = document.getElementById('trainingErrorText');
+      const listEl = document.getElementById('trainingPlanList');
+      const btnStart = document.getElementById('btnStartWorkout');
+      const dayLabel = document.getElementById('trainingDayLabel');
+
+      if (errorEl) errorEl.classList.add('hidden');
+      if (listEl) listEl.innerHTML = '<p class="text-sm text-gray-500 italic text-center py-3">Ładowanie...</p>';
+      if (btnStart) btnStart.classList.add('hidden');
+
+      try {
+        const token = localStorage.getItem('fitai_token');
+        if (!token) throw new Error('Brak tokena logowania');
+
+        // Pobierz dane dzienne z endpointu /app/day/today
+        const r = await fetch(`${window.API_BASE}/app/day/today`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data?.detail || 'Nie udało się pobrać planu');
+
+        const workouts = (data.plan_workouts || []).filter(w => w && !w.hidden);
+        _trainingExecution.exercises = workouts.map((w, i) => ({
+          item_id: w.item_id || ('ex_' + i),
+          name: w.name || w.exercise_name || 'Ćwiczenie',
+          sets: Number(w.sets || w.planned_sets || 3),
+          reps: Number(w.reps || w.planned_reps || 10),
+          weight_kg: Number(w.weight_kg ?? w.weight ?? w.planned_weight_kg ?? 0),
+          rpe: w.rpe || w.planned_rpe || 7,
+          notes: w.notes || '',
+        }));
+
+        if (dayLabel) dayLabel.textContent = new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+
+        if (!_trainingExecution.exercises.length) {
+          if (listEl) listEl.innerHTML = '<p class="text-sm text-gray-500 italic text-center py-3">Brak zaplanowanych ćwiczeń na dziś.</p>';
+          return;
+        }
+
+        if (listEl) {
+          listEl.innerHTML = _trainingExecution.exercises.map((ex, i) => `
+            <div class="flex items-center justify-between p-3 rounded-xl" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);">
+              <div>
+                <p class="text-sm font-medium text-white">${escapeHTML ? escapeHTML(ex.name) : ex.name}</p>
+                <p class="text-xs text-gray-500">${ex.sets}×${ex.reps} ${ex.weight_kg > 0 ? ('@ ' + ex.weight_kg + 'kg') : 'BW'} · RPE ${ex.rpe}</p>
+              </div>
+              <span class="text-xs text-gray-600">#${i + 1}</span>
+            </div>
+          `).join('');
+        }
+        if (btnStart) btnStart.classList.remove('hidden');
+      } catch (e) {
+        console.error('[Training] loadTrainingPlan failed', e);
+        if (errorText) errorText.textContent = e.message || 'Nie udało się pobrać planu';
+        if (errorEl) errorEl.classList.remove('hidden');
+      }
+    }
+
+    // ... rest of training code stays the same ...
+
+    function startWorkout() {
+      if (!_trainingExecution.exercises.length) return;
+      _trainingExecution.mode = 'executing';
+      _trainingExecution.currentIndex = 0;
+      _trainingExecution.setsLogged = [];
+      _trainingExecution.sessionDate = new Date().toISOString().slice(0, 10);
+      _trainingExecution.result = null;
+
+      document.getElementById('trainingIdle')?.classList.add('hidden');
+      document.getElementById('trainingExecution')?.classList.remove('hidden');
+      document.getElementById('trainingResult')?.classList.add('hidden');
+      document.getElementById('trainingError')?.classList.add('hidden');
+
+      renderCurrentExercise();
+    }
+
+    function renderCurrentExercise() {
+      const ex = _trainingExecution.exercises[_trainingExecution.currentIndex];
+      if (!ex) {
+        finishWorkout();
+        return;
+      }
+
+      document.getElementById('trainingCurrentIndex').textContent = _trainingExecution.currentIndex + 1;
+      document.getElementById('trainingTotalCount').textContent = _trainingExecution.exercises.length;
+      document.getElementById('trainingExName').textContent = ex.name;
+      document.getElementById('trainingExPlanned').textContent = `Plan: ${ex.sets}×${ex.reps} ${ex.weight_kg > 0 ? ('@ ' + ex.weight_kg + 'kg') : 'BW'} · RPE ${ex.rpe}`;
+      document.getElementById('trainingExRpe').value = ex.rpe;
+      document.getElementById('trainingExNotes').value = ex.notes || '';
+
+      const container = document.getElementById('trainingSetsContainer');
+      container.innerHTML = '';
+
+      // Pre-fill with planned sets
+      for (let i = 0; i < ex.sets; i++) {
+        addSetRow(
+          i + 1,
+          i === 0 ? ex.reps : '',
+          i === 0 ? ex.weight_kg : '',
+          ex.rpe
+        );
+      }
+
+      // Focus first input
+      setTimeout(() => container.querySelector('input')?.focus(), 50);
+    }
+
+    function addSetRow(setNumber, reps, weightKg, rpe) {
+      const container = document.getElementById('trainingSetsContainer');
+      const idx = container.children.length + 1;
+      const row = document.createElement('div');
+      row.className = 'grid grid-cols-12 gap-2 items-center';
+      row.innerHTML = `
+        <div class="col-span-2 text-xs text-gray-500 font-bold text-center">#${setNumber || idx}</div>
+        <div class="col-span-3">
+          <input type="number" class="set-reps w-full rounded-lg px-2 py-1.5 text-xs" placeholder="Powtórzenia" min="1" value="${reps || ''}" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#fff;">
+        </div>
+        <div class="col-span-3">
+          <input type="number" class="set-weight w-full rounded-lg px-2 py-1.5 text-xs" placeholder="Ciężar (kg)" min="0" step="0.25" value="${weightKg || ''}" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#fff;">
+        </div>
+        <div class="col-span-2">
+          <input type="number" class="set-rpe w-full rounded-lg px-2 py-1.5 text-xs" placeholder="RPE" min="1" max="10" value="${rpe || ''}" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#fff;">
+        </div>
+        <div class="col-span-2 text-right">
+          <button onclick="this.closest('.grid').remove()" class="text-xs text-red-400 hover:text-red-300">✕</button>
+        </div>
+      `;
+      container.appendChild(row);
+    }
+
+    function collectCurrentSets() {
+      const rows = document.querySelectorAll('#trainingSetsContainer .grid');
+      const sets = [];
+      rows.forEach((row, i) => {
+        const reps = Number(row.querySelector('.set-reps')?.value) || 0;
+        const weight = Number(row.querySelector('.set-weight')?.value) || 0;
+        const rpe = Number(row.querySelector('.set-rpe')?.value) || 7;
+        if (reps > 0) {
+          sets.push({ set_number: i + 1, reps, weight_kg: weight, rpe });
+        }
+      });
+      return sets;
+    }
+
+    async function logSetsToBackend(exerciseName, sets) {
+      const token = localStorage.getItem('fitai_token');
+      if (!token) throw new Error('Brak tokena');
+
+      for (const s of sets) {
+        await fetch(`${window.API_BASE}/app/exercise-set`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            exercise_name: exerciseName,
+            set_number: s.set_number,
+            reps: s.reps,
+            weight_kg: s.weight_kg,
+            rpe: s.rpe,
+            session_date: _trainingExecution.sessionDate,
+          }),
+        });
+      }
+    }
+
+    async function markExerciseDone() {
+      const ex = _trainingExecution.exercises[_trainingExecution.currentIndex];
+      if (!ex) return;
+
+      const sets = collectCurrentSets();
+      if (!sets.length) {
+        showToast('⚠️ Zaloguj przynajmniej jedną serię');
+        return;
+      }
+
+      try {
+        await logSetsToBackend(ex.name, sets);
+        _trainingExecution.setsLogged.push({ exercise_name: ex.name, sets });
+        showToast(`✅ Zapisano ${sets.length} serii dla ${ex.name}`);
+        advanceExercise();
+      } catch (e) {
+        console.error('[Training] markExerciseDone failed', e);
+        showToast('❌ Nie udało się zapisać serii');
+      }
+    }
+
+    function skipCurrentExercise() {
+      _trainingExecution.setsLogged.push({ exercise_name: _trainingExecution.exercises[_trainingExecution.currentIndex].name, skipped: true });
+      advanceExercise();
+    }
+
+    function advanceExercise() {
+      _trainingExecution.currentIndex++;
+      if (_trainingExecution.currentIndex >= _trainingExecution.exercises.length) {
+        finishWorkout();
+      } else {
+        renderCurrentExercise();
+      }
+    }
+
+    async function finishWorkout() {
+      const token = localStorage.getItem('fitai_token');
+      if (!token) {
+        showToast('⚠️ Brak tokena logowania');
+        return;
+      }
+
+      const exercisesPayload = _trainingExecution.setsLogged
+        .filter(s => !s.skipped)
+        .map(s => {
+          const totalSets = s.sets.length;
+          const totalReps = s.sets.reduce((a, b) => a + b.reps, 0);
+          const avgWeight = s.sets.length ? (s.sets.reduce((a, b) => a + b.weight_kg, 0) / s.sets.length) : 0;
+          const avgRpe = s.sets.length ? (s.sets.reduce((a, b) => a + b.rpe, 0) / s.sets.length) : 0;
+          return {
+            exercise_name: s.exercise_name,
+            sets: totalSets,
+            reps: totalReps,
+            weight_kg: Math.round(avgWeight * 100) / 100,
+            rpe: Math.round(avgRpe),
+            notes: '',
+          };
+        });
+
+      try {
+        const r = await fetch(`${window.API_BASE}/app/workout/complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            session_date: _trainingExecution.sessionDate,
+            exercises: exercisesPayload,
+            notes: '',
+          }),
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data?.detail || 'Nie udało się zakończyć treningu');
+
+        _trainingExecution.result = data;
+        _trainingExecution.mode = 'result';
+
+        document.getElementById('trainingIdle')?.classList.add('hidden');
+        document.getElementById('trainingExecution')?.classList.add('hidden');
+        document.getElementById('trainingResult')?.classList.remove('hidden');
+        document.getElementById('trainingError')?.classList.add('hidden');
+
+        document.getElementById('trainingResultSummary').textContent =
+          `${data.exercises_count} ćwiczeń · ${data.total_volume_kg}kg · RPE avg ${data.avg_rpe} · +${data.xp_earned} XP`;
+
+        const details = document.getElementById('trainingResultDetails');
+        details.innerHTML = (data.exercises || []).map(ex => `
+          <div class="flex items-center justify-between p-3 rounded-xl" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);">
+            <div>
+              <p class="text-sm font-medium text-white">${escapeHTML ? escapeHTML(ex.exercise_name) : ex.exercise_name}</p>
+              <p class="text-xs text-gray-500">${ex.sets}×${ex.reps} ${ex.weight_kg > 0 ? ('@ ' + ex.weight_kg + 'kg') : 'BW'} · RPE ${ex.rpe}</p>
+            </div>
+          </div>
+        `).join('');
+      } catch (e) {
+        console.error('[Training] finishWorkout failed', e);
+        showToast('❌ Nie udało się zakończyć treningu');
+      }
+    }
+
+    function resetTrainingView() {
+      _trainingExecution = {
+        mode: 'idle',
+        exercises: [],
+        currentIndex: 0,
+        setsLogged: [],
+        sessionDate: null,
+        result: null,
+      };
+      document.getElementById('trainingIdle')?.classList.remove('hidden');
+      document.getElementById('trainingExecution')?.classList.add('hidden');
+      document.getElementById('trainingResult')?.classList.add('hidden');
+      document.getElementById('trainingError')?.classList.add('hidden');
+      loadTrainingPlan();
+    }
+
+    // ========== HISTORY ==========
+
+    async function loadWorkoutHistory() {
+      const listEl = document.getElementById('historyList');
+      const loadingEl = document.getElementById('historyLoading');
+      const errorEl = document.getElementById('historyError');
+      const errorText = document.getElementById('historyErrorText');
+
+      if (loadingEl) loadingEl.classList.remove('hidden');
+      if (errorEl) errorEl.classList.add('hidden');
+      if (listEl) listEl.innerHTML = '<p class="text-sm text-gray-500 italic text-center py-3">Ładowanie historii...</p>';
+
+      try {
+        const token = localStorage.getItem('fitai_token');
+        if (!token) throw new Error('Brak tokena logowania');
+
+        const r = await fetch(`${window.API_BASE}/app/workout/history?limit=20`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data?.detail || 'Nie udało się pobrać historii');
+
+        renderWorkoutHistory(data.sessions || []);
+      } catch (e) {
+        console.error('[History] loadWorkoutHistory failed', e);
+        if (errorText) errorText.textContent = e.message || 'Nie udało się pobrać historii';
+        if (errorEl) errorEl.classList.remove('hidden');
+        if (listEl) listEl.innerHTML = '';
+      } finally {
+        if (loadingEl) loadingEl.classList.add('hidden');
+      }
+    }
+
+    function renderWorkoutHistory(sessions) {
+      const listEl = document.getElementById('historyList');
+      if (!listEl) return;
+
+      if (!sessions.length) {
+        listEl.innerHTML = '<p class="text-sm text-gray-500 italic text-center py-8">Brak zapisanych treningów. Rozpocznij pierwszy trening w zakładce Training.</p>';
+        return;
+      }
+
+      listEl.innerHTML = sessions.map(s => `
+        <div class="glass rounded-2xl p-4 space-y-2">
+          <div class="flex items-center justify-between">
+            <p class="text-sm font-bold text-white">${s.date}</p>
+            <span class="text-xs px-2 py-1 rounded-lg" style="background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.2);color:#00e5ff;">${s.exercises_count} ćwiczeń · ${s.total_volume_kg}kg</span>
+          </div>
+          <p class="text-xs text-gray-500">Średnie RPE: ${s.avg_rpe}</p>
+          <div class="space-y-1">
+            ${(s.exercises || []).map(ex => `
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-gray-300">${escapeHTML ? escapeHTML(ex.exercise_name) : ex.exercise_name}</span>
+                <span class="text-gray-500">${ex.sets}×${ex.reps} ${ex.weight_kg > 0 ? ('@ ' + ex.weight_kg + 'kg') : 'BW'} · RPE ${ex.rpe}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // ========== TAB INIT HOOKS ==========
+
+    const _originalShowTab = showTab;
+    showTab = function(tabId) {
+      _originalShowTab(tabId);
+      if (tabId === 'training') {
+        resetTrainingView();
+      } else if (tabId === 'history') {
+        loadWorkoutHistory();
+      }
+    };
+    window.showTab = showTab;
+
     // ═══════════ PLAN HYBRID NAVIGATION ═══════════
 
     // Tab definitions per category
@@ -25492,7 +25996,9 @@
           return;
         }
 
-        container.innerHTML = workouts.map(item => {
+        let html = '<div class="mb-3"><button onclick="startWorkoutFromToday()" class="btn-neon px-4 py-2 rounded-xl text-xs font-bold">🏋️ Rozpocznij trening</button></div>';
+
+        html += workouts.map(item => {
           const checked = !!(item.checked || item.done);
           const strike = checked ? 'line-through opacity-70' : '';
           const opacity = checked ? '0.5' : '1';
@@ -25507,7 +26013,7 @@
                 <div class="flex-1 min-w-0">
                   <div class="flex flex-wrap items-center gap-2">
                     <p class="text-sm md:text-base font-semibold text-white ${strike}">${escapeHTML(item.name)}</p>
-                    <span class="chip">Serie × Powt × Ciężar</span>
+                    <span class="chip">${item.sets || 0}×${item.reps || 0} ${Number(item.weight_kg || 0) > 0 ? ('@ ' + item.weight_kg + 'kg') : 'BW'}</span>
                   </div>
                   <div class="mt-3 grid gap-2 md:grid-cols-4 items-end">
                     <label class="text-xs text-gray-400 block">
@@ -25536,6 +26042,8 @@
               </div>
             </div>`;
         }).join('');
+
+        container.innerHTML = html;
 
         recalcBars(_dayTrackerState.kcalConsumed, _dayTrackerState.proteinConsumed);
       }

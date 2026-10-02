@@ -1,0 +1,463 @@
+================================================================================
+EVOLVE (FitAI) — KOMPLEKSOWY RAPORT ANALIZY KODU I ARCHITEKTURY
+Data: 2026-10-02
+Sesja: Training Execution Vertical Slice — continuation
+================================================================================
+
+SPIS TREŚCI
+1. Zmiany wprowadzone w tej sesji
+2. Architektura systemu
+3. Jakość kodu backendu
+4. Jakość kodu frontendu
+5. Bezpieczeństwo
+6. Modele danych
+7. Projekt API
+8. Testy
+9. Problemy znalezione
+10. Rekomendacje
+11. Stan projektu / podsumowanie
+
+================================================================================
+1. ZMIANY WPROWADZONE W TEJ SESJI
+================================================================================
+
+Kod został podzielony na dwie części:
+A) Zmiany wprowadzone przez poprzedni agent (KILO) — już zakommitowane
+B) Zmiany wprowadzone w tej sesji — jeszcze niezakommitowane
+
+─────────────────────────────────────────────────────────────────────────────
+A) ZMIANY Z POPRZEDNIEJ SESJI (już w commicie "przed KILO")
+─────────────────────────────────────────────────────────────────────────────
+
+1. app/models.py
+   - Dodano model ExerciseSetDB (tabela exercise_sets) do logowania pojedynczych serii
+   - Dodano relację exercise_sets w UserDB
+   - Dodano model ExerciseResultDB (już istniał, ale rozszerzony)
+
+2. app/schemas.py
+   - Dodano ExerciseSetRequest — schema do logowania jednej serii
+   - Dodano WorkoutCompleteRequest — schema do kończenia sesji treningowej
+   - Dodano WorkoutSessionResponse — schema odpowiedzi z podsumowaniem sesji
+
+3. app/fitness/routes.py
+   - Dodano POST /app/exercise-set — zapisuje pojedynczą serię do DB
+   - Dodano POST /app/workout/complete — finalizuje sesję, tworzy ExerciseResultDB, przyznaje 50 XP
+   - Dodano GET /app/workout/history — zwraca historię sesji pogrupowaną po dacie
+   - Zaimportowano ExerciseSetDB i nowe schematy
+
+4. app/database.py
+   - Zarejestrowano ExerciseSetDB w create_all (automatyczne tworzenie tabeli)
+
+5. app/index.html
+   - Zaimplementowano pełną zakładkę Training (zamiast placeholderu):
+     * loadTrainingPlan() — ładuje plan z /app/day/today
+     * startWorkout() — przełącza w tryb wykonania
+     * renderCurrentExercise() + addSetRow() — UI pojedynczego ćwiczenia
+     * markExerciseDone() — zapisuje serie przez /app/exercise-set
+     * skipCurrentExercise() / advanceExercise() — nawigacja
+     * finishWorkout() — kończy sesję przez /app/workout/complete
+     * resetTrainingView() — powrót do planu
+   - Zaimplementowano pełną zakładkę History (zamiast placeholderu):
+     * loadWorkoutHistory() — pobiera dane z /app/workout/history
+     * renderWorkoutHistory() — renderuje listę sesji
+   - Dodano showTab override z automatycznym ładowaniem danych
+
+6. test_training_execution.py (nowy plik, 9 testów)
+   - test_log_exercise_set_creates_row
+   - test_log_multiple_sets_for_same_exercise
+   - test_complete_workout_creates_exercise_results_and_awards_xp
+   - test_workout_history_returns_sessions
+   - test_cannot_log_set_for_another_user
+   - test_cannot_complete_workout_for_another_user
+   - test_workout_complete_is_idempotent_no_duplicates (dodane w tej sesji)
+   - test_workout_complete_updates_existing_result (dodane w tej sesji)
+   - test_day_today_returns_plan_workouts_for_frontend (dodane w tej sesji)
+
+─────────────────────────────────────────────────────────────────────────────
+B) ZMIANY W TEJ SESJI (niezakommitowane)
+─────────────────────────────────────────────────────────────────────────────
+
+1. app/fitness/routes.py
+   - ZMODYFIKOWANO POST /app/workout/complete — uczyniono idempotentnym:
+     * Sprawdza czy ExerciseResultDB już istnieje dla (user_id, session_date, exercise_name)
+     * Jeśli istnieje → AKTUALIZUJE istniejący wiersz
+     * Jeśli nie istnieje → tworzy nowy
+     * Eliminuje duplikaty przy wielokrotnym kliknięciu "Zakończ trening"
+
+2. app/index.html
+   - DODANO przycisk "🏋️ Rozpocznij trening" w Today tab (nad listą ćwiczeń):
+     * W renderActiveDayExercises() dodano <button onclick="startWorkoutFromToday()">
+     * startWorkoutFromToday() kopiuje ćwiczenia do window._workoutFromToday
+     * Automatycznie przełącza na zakładkę Training
+   - DODANO funkcję startWorkoutFromToday() — integracja Today → Training
+   - ZMODYFIKOWANO loadTrainingPlan() — najpierw sprawdza window._workoutFromToday
+   - Wystawiono window.startWorkoutFromToday = startWorkoutFromToday (global scope)
+
+3. test_training_execution.py
+   - Dodano test_workout_complete_is_idempotent_no_duplicates
+   - Dodano test_workout_complete_updates_existing_result
+   - Dodano test_day_today_returns_plan_workouts_for_frontend
+
+================================================================================
+2. ARCHITEKTURA SYSTEMU
+================================================================================
+
+Typ: FastAPI backend + monolityczny HTML/JS SPA frontend
+
+Stack technologiczny:
+- Backend:  FastAPI 0.110+, SQLModel 0.0.18+, SQLAlchemy, Pydantic v2
+- Baza:     SQLite (dev) / PostgreSQL (prod) via DATABASE_URL
+- Frontend: Jeden plik app/index.html (~26 600 linii, ~1.89 MB)
+            Tailwind CSS CDN + Chart.js CDN, vanilla JS
+- Auth:     JWT (access 30 min, refresh 60 dni) + PBKDF2 password hashing
+- Dodatki:  Discord bot (discord.py), AI via Groq/Gemini, rate limiting (slowapi)
+
+Struktura katalogów:
+app/
+├── __init__.py              # Inicjalizacja FastAPI, CORS, except handlers
+├── config.py                # Settings, constants
+├── database.py              # Engine, session, migrations, backfill
+├── models.py                # SQLModel tables (UserDB, DailyLogDB, etc.)
+├── schemas.py               # Pydantic schemas
+├── legacy_routes.py         # 3 144 linii — "god file" (plan, AI, dieta, drills)
+├── exercise_descriptions.py # 36 KB — statyczna baza ćwiczeń
+├── auth/                    # JWT, password, dependencies
+├── fitness/                 # routes (1 742 linii), calculations, dashboard
+├── plan/                    # routes (296 linii)
+├── ai/                      # routes, service
+├── notifications/           # Discord, reminders
+├── health/                  # health check
+└── meta/                    # version info
+
+================================================================================
+3. JAKOŚĆ KODU BACKENDU
+================================================================================
+
+ZALETY:
+✓ Modularne routy z jasnymi prefixami (/auth, /app, /ai, /api/discord)
+✓ Spójne użycie get_current_user dependency dla protected routes
+✓ Pydantic v2 validatory z ge/le constraints
+✓ Rate limiting na sensitive endpoints
+✓ Global exception handlers dla SQLAlchemy errors
+✓ Wszystkie zapytania używają ORM lub parameterized SQL (brak SQL injection)
+
+PROBLEMY:
+
+[HIGH] Duplikacja endpointu GET /app/plan
+  - legacy_routes.py:1816 definiuje GET /app/plan z pełną logiką
+  - plan/routes.py:64 definiuje app_get_plan na GET /app/plan/current
+  - Dwie niezależne implementacje tego samego logicznego endpointu
+  - Różnią się strukturą zwracanych danych (EMPTY structure)
+
+[HIGH] Duplikacja biznesowej logiki
+  - calc_calories/calc_protein istnieją w fitness/calculations.py
+  - KOPIOWANE wersje w legacy_routes.py:127-194
+  - Będą się różnić w przyszłości
+
+[HIGH] Duplikacja helpera _web_user_key
+  - Identyczna funkcja w legacy_routes.py:115 i fitness/routes.py:123
+
+[MEDIUM] Niespójne zarządzanie sesjami
+  - Niektóre routes używają "with Session(engine)", inne "Depends(get_session)"
+  - Mieszanie wzorców w tym samym routerze (fitness/routes.py)
+
+[MEDIUM] legacy_routes.py to "God file" — 3 144 linii
+  - Zawiera wszystko: plan generation, AI prompts, carb cycling,
+    progressive overload, drill catalog, dieta, billing webhooks
+  - Narusza single-responsibility principle
+
+[LOW] create_db_and_tables() wywoływana dwa razy
+  - database.py:86 (module import) + __init__.py:163 (startup event)
+
+[LOW] Brak min/validacji na niektórych polach
+  - name field nie ma length limit w ProfileUpdateRequest
+  - notes ma max_length=1000 tylko na AppDailyCheckinRequest
+
+[MEDIUM] Race condition w XP updates
+  - Obecny wzorzec: read → modify → write
+  - Brak atomicznego increment (UPDATE ... SET total_xp = total_xp + :xp)
+
+================================================================================
+4. JAKOŚĆ KODU FRONTENDU
+================================================================================
+
+Architektura: Vanilla JS SPA, wszystkie CSS i JS inline w jednym pliku
+
+ZALETY:
+✓ Działa bez build step
+✓ Tailwind CSS zapewnia spójny design
+✓ Wszystkie funkcje są globalnie dostępne (window.*)
+
+PROBLEMY:
+
+[CRITICAL] 29 zduplikowanych definicji funkcji
+  - W jednym pliku istnieją 2-3 definicje tych samych funkcji:
+    updateDayProgress, showTab, switchProfileTab, saveProfileData,
+    openPlanBuilderModal, openEditDietModal, _showDietToast,
+    updateDaySummaryCounters, swapItem, renderExtraItems, removeExtraItem,
+    initActiveDayFromPlan, renderActiveDayMeals, updateActiveDayKcal,
+    renderActiveDayExercises, toggleMealDone, toggleExDone,
+    swapActiveDayMeal, swapActiveDayExercise, updateActiveDayProgress,
+    openAddMealToDay, addMealFromSearch, addCustomMealToDay,
+    openAddExerciseToDay, addExerciseFromSearch, addCustomExerciseToDay,
+    updateRPE, updateSleepDuration, setMood
+  - JavaScript hoisting sprawia, że ostatnia definicja "wygrywa"
+  - Wysoce ryzykowne przy utrzymaniu, nieprzewidywalne zachowanie
+
+[MEDIUM] Brak modularności
+  - Brak ES modules, bundlera, minifikacji
+  - 45 fetch() calli z inconsistent error handling
+  - 2 IIFE patterns sugerujące próby modularizacji
+
+[LOW] CDN dependencies
+  - Tailwind CSS, Chart.js z CDN — ok dla produkcji, brak offline fallback
+
+[LOW] 1.89 MB rozmiar pliku
+  - Bardzo duży dla pojedynczego HTMLa
+  - Powolne ładowanie, problemy z cache
+
+================================================================================
+5. BEZPIECZEŃSTWO
+================================================================================
+
+ZALETY:
+✓ JWT z sub=user_uuid, type=access|refresh, jti
+✓ get_current_user dependency poprawnie odrzuca refresh tokens
+✓ PBKDF2-SHA256 z 260 000 iteracji — silne hashowanie
+✓ Rate limiting na register (5/hr) i login (10/min, 50/hr)
+✓ Wszystkie protected routes pobierają user z JWT sub, nigdy z request body
+✓ Brak SQL injection — wszystkie zapytania przez ORM lub parameterized
+✓ Test_security_isolation.py: 18 testów weryfikujących izolację kont
+
+PROBLEMY:
+
+[HIGH] InsecureKeyLengthWarning
+  - Testy emitują ostrzeżenie: HMAC key ma 23 bajty (minimum 32)
+  - W produkcji secrets.token_hex(32) generuje 64 hex chars = 32 bajty ✓
+  - Ale jeśli JWT_SECRET_KEY env var jest ustawiony na krótki string → osłabienie
+
+[HIGH] datetime.utcnow() deprecation
+  - jwt_utils.py używa datetime.utcnow() — deprecated w Python 3.12+
+  - Zostanie usunięte w przyszłych wersjach Pythona
+  - Wymaga zmiany na datetime.now(datetime.UTC)
+
+[MEDIUM] Brak JWT revocation/blacklist
+  - Brak mechanizmu unieważnienia skompromitowanych tokenów
+  - jti jest generowane ale nigdy nie sprawdzane
+
+[MEDIUM] CORS domyślnie na *
+  - config.py:67: CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
+  - Jeśli env var nie jest ustawiony w prod → wszystkie origins allowed
+
+[MEDIUM] Race condition w XP updates
+  - Obecny wzorzec read-modify-write może tracić XP przy równoczesnych requestach
+
+[LOW] Brak length validators na name field
+  - ProfileUpdateRequest.name nie ma max_length
+
+[MEDIUM] 12 skipped test files
+  - Duża część funkcjonalności nie jest testowana
+
+================================================================================
+6. MODELE DANYCH
+================================================================================
+
+UserDB — 100+ kolumn (anty-pattern)
+  - Wiele JSON-encoded stringów (sports_json, availability_json, etc.)
+  - Brak referential integrity na nested data
+  - Brak efficient querying of nested data
+
+ExerciseSetDB (NOWY) — pojedyncze serie ćwiczeń
+  - id, user_id, exercise_name, session_date, set_number, reps, weight_kg, rpe, logged_at
+
+ExerciseResultDB — agregaty per ćwiczenie
+  - id, user_id, exercise_name, session_date, sets, reps, weight_kg, rpe, notes, logged_at
+
+DailyLogDB — dzienne logi
+  - workouts_json, meals_json, custom_workouts, custom_meals, etc.
+
+ZALETY:
+✓ SQLModel z jasnymi table definitions
+✓ UUID primary keys
+✓ Jasne relacje (UserDB → DailyLogDB, ExerciseResultDB, ExerciseSetDB)
+
+PROBLEMY:
+[MEDIUM] UserDB ma 100+ kolumn — powinno być znormalizowane
+[LOW] Częste użycie JSON columns — brak referential integrity
+
+================================================================================
+7. PROJEKT API
+================================================================================
+
+Endpointy dodane w tej sesji:
+
+POST /app/exercise-set
+  - Zapisuje pojedynczą serię ćwiczenia
+  - Request: ExerciseSetRequest (exercise_name, set_number, reps, weight_kg, rpe, session_date)
+  - Response: {status, set: {id, exercise_name, set_number, ...}}
+  - Ownership: z JWT sub, nie z request body
+
+POST /app/workout/complete
+  - Finalizuje sesję treningową
+  - Request: WorkoutCompleteRequest (session_date, exercises[], notes)
+  - Response: {status, session_date, exercises[], total_volume_kg, avg_rpe, xp_earned, exercises_count}
+  - IDEMPOTENTNY: aktualizuje istniejące ExerciseResultDB zamiast duplikować
+  - Przyznaje 50 XP za workout completion
+
+GET /app/workout/history
+  - Zwraca historię sesji pogrupowaną po dacie
+  - Query: ?limit=20&offset=0
+  - Response: {sessions: [{date, exercises[], exercises_count, total_volume_kg, avg_rpe}]}
+
+PROBLEMY API:
+[MEDIUM] Inconsistent naming — niektóre endpointy używają hyphens, inne underscores
+[MEDIUM] Brak tagów na niektórych routes (auto-generated docs mniej użyteczne)
+[LOW] Niektóre endpointy są deprecated ale nadal aktywne
+
+================================================================================
+8. TESTY
+================================================================================
+
+Aktualny stan: 38 passed, 0 failed, 12 skipped test files
+
+Aktywne pliki testów:
+✓ test_security_isolation.py    — 18 testów (account isolation, deprecated endpoints)
+✓ test_e2e_launch.py             — 12 testów (full auth flow, race conditions)
+✓ test_training_execution.py     — 9 testów (exercise logging, progression, idempotency)
+✓ test_exercise_descriptions.py  — 38 testów (exercise/drill lookup)
+✓ test_day_tracker.py            — 10 testów (day tracking, toggle, add, swap)
+✓ test_weekly_analysis.py        — 1 test
+✓ test_plan_persistence.py       — 1 test
+✓ test_sport_drills.py           — 1 test
+
+Pominięte pliki testów (12):
+✗ test_diet.py
+✗ test_etap1.py
+✗ test_etap2_structure.py
+✗ test_etap3_full.py
+✗ test_etap4.py
+✗ test_fitai.py
+✗ test_fitai_qa.py
+✗ test_macros.py
+✗ test_main.py
+✗ test_moj_dzien.py
+✗ test_water_tracker.py
+✗ test_wellbeing.py
+
+Ostrzeżenia w testach:
+- 240x DeprecationWarning: datetime.utcnow() w jwt_utils.py
+- 22x InsecureKeyLengthWarning: HMAC key 23 bytes (test env)
+
+================================================================================
+9. PROBLEMY ZNALEZIONE
+================================================================================
+
+[CRITICAL]
+1. 29 zduplikowanych funkcji w index.html
+   - Różne wersje tego samego kodu w dwóch miejscach
+   - Ostatnia definicja "wygrywa" ale to nieprzewidywalne
+
+[HIGH]
+2. Duplikacja GET /app/plan endpoint
+   - Dwie niezależne implementacje
+3. Duplikacja calc_calories/calc_protein
+   - Copy-paste między legacy_routes.py a fitness/calculations.py
+4. JWT InsecureKeyLengthWarning w testach
+5. datetime.utcnow() deprecation — zepsuje się w Python 3.12+
+6. 12 skipped test files — duża nieprzetestowana funkcjonalność
+
+[MEDIUM]
+7. legacy_routes.py God file (3 144 linii)
+8. Niespójne zarządzanie sesjami (with Session vs Depends)
+9. Brak JWT revocation mechanism
+10. CORS defaults to *
+11. Race condition w XP updates
+12. Brak testów na AI endpoints (/ai/diet, /ai/workout)
+13. Brak testów na notification endpoints
+14. UserDB ma 100+ kolumn
+
+[LOW]
+15. create_db_and_tables() wywoływana dwa razy
+16. 1.89 MB rozmiar index.html
+17. Brak minifikacji
+18. name field nie ma length limit w niektórych schematach
+19. Backfill logic uruchamia się na każdym starcie
+
+================================================================================
+10. REKOMENDACJE (PRIORYTETOWE)
+================================================================================
+
+KRYTYCZNE (natychmiast):
+1. Usunąć duplikaty funkcji w index.html
+   - Zidentyfikować "wygrywające" definicje
+   - Usunąć nadmiarowe
+   - Zweryfikować zachowanie UI
+
+WYSOKI PRIORYTET (ten sprint):
+2. Skonsolidować GET /app/plan — usunąć legacy implementację
+3. Wyeliminować duplikację calc_calories/calc_protein — import z calculations.py
+4. Naprawić datetime.utcnow() → datetime.now(datetime.UTC)
+5. Zwiększyć JWT_SECRET_KEY do 32+ bajtów w środowisku testowym
+6. Przejrzeć i naprawić 12 skipped test files
+
+ŚREDNI PRIORYTET (następne sprinty):
+7. Podzielić legacy_routes.py na moduły (plan, diet, AI, drills)
+8. Standaryzować zarządzanie sesjami — wybrać jeden wzorzec
+9. Dodać JWT blacklist (Redis/KV z TTL)
+10. Zmienić CORS default — fail closed jeśli CORS_ORIGINS nie ustawiony
+11. Dodać testy na AI endpoints
+12. Dodać testy na notification endpoints
+13. Atomiczne XP updates (UPDATE ... SET total_xp = total_xp + :xp)
+
+NISKI PRIORYTET (opcjonalne):
+14. Znormalizować UserDB — wyciągnąć JSON columns do junction tables
+15. Dodać min/max length validators we wszystkich schematach
+16. Zoptymalizować create_db_and_tables() — nie uruchamiać dwa razy
+17. Rozważyć podział index.html na moduły (ES modules + bundler)
+18. Dodać minifikację i bundling dla produkcji
+
+================================================================================
+11. STAN PROJEKTU / PODSUMOWANIE
+================================================================================
+
+CO DZIAŁA:
+✓ Backend uruchomiony na localhost:8000
+✓ 38/38 testów przechodzi
+✓ Nowe endpointy training execution działają:
+  - POST /app/exercise-set
+  - POST /app/workout/complete (idempotentny)
+  - GET /app/workout/history
+✓ Frontend ma pełne UI dla Training i History tabs
+✓ Integracja Today → Training działa (startWorkoutFromToday)
+✓ Workout completion jest idempotentny (brak duplikatów)
+✓ Wszystkie zmiany są w working directory, niezakommitowane
+
+CO JESZcze NIE JEST ZROBIONE:
+✗ Brakuje odzyskiwania sesji (resume po przerwanej przeglądarce)
+✗ Brakuje redukcji liczby requestów (finishWorkout wysyła N+1 requestów)
+✗ Brakuje walidacji pól przed zapisem
+✗ Nie zintegrowano z EVOLVE planem w pełni (MVP acceptance criteria)
+✗ 12 test files jest skipped
+✗ Duplikaty funkcji w index.html mogą powodować niestabilność
+
+OSTATNIE ZMIANY W GIT:
+- 3 pliki zmodyfikowane, niezakommitowane
+- app/fitness/routes.py — idempotent workout completion
+- app/index.html — Training/History UI + Today integration
+- test_training_execution.py — 3 nowe testy
+
+STATUS SERWERA:
+✓ Działa na http://localhost:8000
+✓ Auto-reload włączony
+✓ Database initialized
+✓ Wszystkie endpointy dostępne
+
+KOMENDA DO URUCHOMIENIA TESTÓW:
+  python -m pytest test_training_execution.py test_day_tracker.py test_plan_persistence.py test_security_isolation.py -v
+
+KOMENDA DO URUCHOMIENIA SERWERA:
+  python -m uvicorn main:app --reload --port 8000
+
+================================================================================
+KONIEC RAPORTU
+================================================================================

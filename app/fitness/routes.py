@@ -1317,18 +1317,35 @@ def complete_workout(
             rpe = int(ex.get("rpe") or 1)
             notes = str(ex.get("notes") or "")
 
-            result = ExerciseResultDB(
-                user_id=db_user.id,
-                exercise_name=exercise_name,
-                session_date=session_date,
-                sets=sets,
-                reps=reps,
-                weight_kg=weight_kg,
-                rpe=rpe,
-                notes=notes,
-            )
-            session.add(result)
-            results.append(result)
+            existing = session.exec(
+                select(ExerciseResultDB)
+                .where(ExerciseResultDB.user_id == db_user.id)
+                .where(ExerciseResultDB.session_date == session_date)
+                .where(ExerciseResultDB.exercise_name == exercise_name)
+            ).first()
+
+            if existing:
+                existing.sets = sets
+                existing.reps = reps
+                existing.weight_kg = weight_kg
+                existing.rpe = rpe
+                existing.notes = notes
+                session.add(existing)
+                results.append(existing)
+            else:
+                result = ExerciseResultDB(
+                    user_id=db_user.id,
+                    exercise_name=exercise_name,
+                    session_date=session_date,
+                    sets=sets,
+                    reps=reps,
+                    weight_kg=weight_kg,
+                    rpe=rpe,
+                    notes=notes,
+                )
+                session.add(result)
+                results.append(result)
+
             total_volume += sets * reps * weight_kg
             rpe_values.append(rpe)
 
